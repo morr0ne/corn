@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use serde::de;
 
-use crate::{Error, Value};
+use crate::{Error, Result, Value};
 
+/// A structure that deserializes Corn into Rust values.
 #[derive(Clone)]
 pub struct Deserializer<'de> {
     bytes: &'de [u8],
@@ -11,12 +12,91 @@ pub struct Deserializer<'de> {
     variables: HashMap<String, Value>,
 }
 
-impl Deserializer<'_> {
-    pub fn from_str(input: &str) -> Self {
+impl<'de> Deserializer<'de> {
+    /// Refer to the `Deserializer::from_str` method for more info.
+    pub fn from_str(input: &'de str) -> Self {
+        Self {
+            bytes: input.as_bytes(),
+            index: 0,
+            variables: HashMap::new(),
+        }
+    }
+
+    fn advance(&mut self) {
+        self.index += 1;
+    }
+
+    fn next(&mut self) -> Result<Option<u8>> {
+        let byte = self.peek()?;
+
+        self.advance();
+
+        Ok(byte)
+    }
+
+    fn peek(&mut self) -> Result<Option<u8>> {
+        Ok(self.bytes.get(self.index).copied())
+    }
+
+    fn parse_whitespace(&mut self) -> Result<Option<u8>> {
+        loop {
+            match self.peek()? {
+                Some(byte) if byte.is_ascii_whitespace() => {
+                    self.advance();
+                }
+                other => return Ok(other),
+            }
+        }
+    }
+
+    fn whitespace_or_eof(&mut self) -> Result<u8> {
+        match self.parse_whitespace() {
+            Ok(Some(byte)) => Ok(byte),
+            Ok(None) => Err(Error::Eof),
+            Err(err) => Err(err),
+        }
+    }
+
+    fn parse_key(&mut self) -> Result<String> {
         todo!()
+    }
+
+    fn parse_ident(&mut self, ident: &[u8]) -> Result<()> {
+        for expected in ident {
+            match self.next()? {
+                None => {
+                    return Err(Error::Eof);
+                }
+                Some(next) => {
+                    if next != *expected {
+                        return Err(Error::DeserializationError("No ident".to_string()));
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
+/// Deserializes a Corn-formatted string into a Rust type.
+///
+/// # Example
+///
+/// ```
+/// use corn::from_str;
+///
+/// #[derive(serde::Deserialize)]
+/// struct Config {
+///     name: String,
+///     version: u32,
+/// }
+///
+/// let corn_str = "{ name = \"My App\" version = 1 }";
+/// let config: Config = from_str(corn_str).unwrap();
+/// assert_eq!(config.name, "My App");
+/// assert_eq!(config.version, 1);
+/// ```
 pub fn from_str<'a, T>(s: &'a str) -> Result<T, Error>
 where
     T: de::Deserialize<'a>,
@@ -33,14 +113,62 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        match self.whitespace_or_eof()? {
+            b'{' => {
+                self.advance();
+                visitor.visit_map(MapAccess::new(self))
+            }
+            b'[' => {
+                self.advance();
+                visitor.visit_seq(SeqAccess::new(self))
+            }
+            b'n' => {
+                self.parse_ident(b"null")?;
+                visitor.visit_unit()
+            }
+            b't' => {
+                self.parse_ident(b"true")?;
+                visitor.visit_bool(true)
+            }
+            b'f' => {
+                self.parse_ident(b"false")?;
+                visitor.visit_bool(false)
+            }
+            b'-' => {
+                unimplemented!("Negative number")
+            }
+            b'0'..=b'9' => {
+                unimplemented!("Number parsing")
+            }
+            b'"' => {
+                unimplemented!("String parsing")
+            }
+            token => Err(Error::unexpected_token(
+                "one of: ", // FIXME: include more info
+                token, self.index,
+            )),
+        }
     }
 
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        match self.whitespace_or_eof()? {
+            b't' => {
+                self.parse_ident(b"true")?;
+                visitor.visit_bool(true)
+            }
+            b'f' => {
+                self.parse_ident(b"false")?;
+                visitor.visit_bool(false)
+            }
+            token => Err(Error::unexpected_token(
+                "one of: true, false",
+                token,
+                self.index,
+            )),
+        }
     }
 
     fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -131,7 +259,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        self.deserialize_str(visitor)
     }
 
     fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -226,7 +354,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        self.deserialize_map(visitor)
     }
 
     fn deserialize_enum<V>(
@@ -256,108 +384,101 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     }
 }
 
-// impl Entry {
-//     pub const fn as_type(&self) -> &'static str {
-//         match self {
-//             Self::String(_) => todo!(),
-//             // Self::InterpolatedString(string_parts) => todo!(),
-//             Self::Integer(_) => todo!(),
-//             Self::Float(_) => todo!(),
-//             Self::Boolean(_) => todo!(),
-//             Self::Object(object_entry) => todo!(),
-//             Self::Array(array_entry) => todo!(),
-//             Self::Input(_) => todo!(),
-//             Self::Null => todo!(),
-//         }
-//     }
-// }
+struct SeqAccess<'a, 'de: 'a> {
+    de: &'a mut Deserializer<'de>,
+}
 
-// #[derive(Debug, Clone)]
-// pub enum ObjectEntry {
-//     Flat(IndexMap<String, Entry>),
-//     WithSpreads(Vec<ObjectPart>),
-// }
+impl<'a, 'de> SeqAccess<'a, 'de> {
+    pub fn new(de: &'a mut Deserializer<'de>) -> Self {
+        Self { de }
+    }
+}
 
-// #[derive(Debug, Clone)]
-// pub enum ObjectPart {
-//     Pair(String, Entry),
-//     Spread(String),
-// }
+impl<'a, 'de> de::SeqAccess<'de> for SeqAccess<'a, 'de> {
+    type Error = Error;
 
-// #[derive(Debug, Clone)]
-// pub enum ArrayEntry {
-//     Flat(Vec<Entry>),
-//     WithSpreads(Vec<ArrayPart>),
-// }
+    fn next_element_seed<T>(
+        &mut self,
+        seed: T,
+    ) -> std::result::Result<Option<T::Value>, Self::Error>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        todo!()
+    }
+}
 
-// /// Part of an array with spreads
-// #[derive(Debug, Clone)]
-// pub enum ArrayPart {
-//     Entry(Entry),
-//     Spread(String),
-// }
+struct MapAccess<'a, 'de: 'a> {
+    de: &'a mut Deserializer<'de>,
+}
 
-// /// Helpers for the parser
-// #[derive(Debug, Clone)]
-// pub(crate) enum SpreadOr<T> {
-//     Spread(String),
-//     Other(T),
-// }
+impl<'a, 'de> MapAccess<'a, 'de> {
+    pub fn new(de: &'a mut Deserializer<'de>) -> Self {
+        Self { de }
+    }
+}
 
-// pub(crate) fn pairs_to_object(pairs: Vec<SpreadOr<(String, Entry)>>) -> ObjectEntry {
-//     let has_spreads = pairs.iter().any(|p| matches!(p, SpreadOr::Spread(_)));
+impl<'a, 'de> de::MapAccess<'de> for MapAccess<'a, 'de> {
+    type Error = Error;
 
-//     if has_spreads {
-//         let parts: Vec<ObjectPart> = pairs
-//             .into_iter()
-//             .map(|p| match p {
-//                 SpreadOr::Other((k, v)) => ObjectPart::Pair(k, v),
-//                 SpreadOr::Spread(name) => ObjectPart::Spread(name),
-//             })
-//             .collect();
-//         ObjectEntry::WithSpreads(parts)
-//     } else {
-//         let map: IndexMap<String, Entry> = pairs
-//             .into_iter()
-//             .filter_map(|p| match p {
-//                 SpreadOr::Other((k, v)) => Some((k, v)),
-//                 _ => None, // This should never happen if has_spreads is false
-//             })
-//             .collect();
-//         ObjectEntry::Flat(map)
-//     }
-// }
+    fn next_key_seed<K>(&mut self, seed: K) -> std::result::Result<Option<K::Value>, Self::Error>
+    where
+        K: de::DeserializeSeed<'de>,
+    {
+        println!("Calling key seed");
 
-// pub(crate) fn entries_to_array(entries: Vec<SpreadOr<Entry>>) -> ArrayEntry {
-//     let has_spreads = entries.iter().any(|e| matches!(e, SpreadOr::Spread(_)));
+        match self.de.whitespace_or_eof()? {
+            b'}' => {
+                self.de.advance();
+                return Ok(None);
+            }
+            b'\'' => {
+                todo!()
+            }
+            token => {
+                println!("Got to token {token}");
+                let start = self.de.index;
 
-//     if has_spreads {
-//         let parts: Vec<ArrayPart> = entries
-//             .into_iter()
-//             .map(|e| match e {
-//                 SpreadOr::Other(v) => ArrayPart::Entry(v),
-//                 SpreadOr::Spread(name) => ArrayPart::Spread(name),
-//             })
-//             .collect();
-//         ArrayEntry::WithSpreads(parts)
-//     } else {
-//         let values: Vec<Entry> = entries
-//             .into_iter()
-//             .filter_map(|e| match e {
-//                 SpreadOr::Other(v) => Some(v),
-//                 _ => None, // This should never happen if has_spreads is false
-//             })
-//             .collect();
-//         ArrayEntry::Flat(values)
-//     }
-// }
+                loop {
+                    match self.de.peek()? {
+                        Some(byte) => {
+                            if byte.is_ascii_whitespace() || matches!(byte, b'.' | b'=') {
+                                break;
+                            }
 
-// // pub(crate) fn create_nested_entry(keys: Vec<String>, value: Entry) -> Entry {
-// //     let mut current = value;
+                            self.de.advance();
+                        }
+                        None => break,
+                    }
+                }
 
-// //     for key in keys.into_iter().rev() {
-// //         current = Entry::Object(ObjectEntry::Flat(indexmap! {key => current}));
-// //     }
+                let end = self.de.index;
 
-// //     current
-// // }
+                if start == end {
+                    // return Err(Error::EmptyKey);
+                }
+
+                let key = std::str::from_utf8(&self.de.bytes[start..end])
+                    .map_err(|_| Error::InvalidUtf8)?;
+
+                seed.deserialize(de::value::StrDeserializer::new(key))
+                    .map(Some)
+            }
+        }
+    }
+
+    fn next_value_seed<V>(&mut self, seed: V) -> std::result::Result<V::Value, Self::Error>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        println!("Calling value seed");
+
+        match self.de.whitespace_or_eof()? {
+            b'=' => {
+                self.de.advance(); // Skip the equals sign
+                seed.deserialize(&mut *self.de)
+            }
+            token => Err(Error::unexpected_token("=", token, self.de.index)),
+        }
+    }
+}
