@@ -539,8 +539,6 @@ impl<'a, 'de> de::MapAccess<'de> for MapAccess<'a, 'de> {
     where
         K: de::DeserializeSeed<'de>,
     {
-        println!("Calling key seed");
-
         match self.de.whitespace_or_eof()? {
             b'}' => {
                 self.de.advance();
@@ -550,7 +548,6 @@ impl<'a, 'de> de::MapAccess<'de> for MapAccess<'a, 'de> {
                 todo!()
             }
             token => {
-                println!("Got to token {token}");
                 let start = self.de.index;
 
                 loop {
@@ -585,8 +582,6 @@ impl<'a, 'de> de::MapAccess<'de> for MapAccess<'a, 'de> {
     where
         V: de::DeserializeSeed<'de>,
     {
-        println!("Calling value seed");
-
         match self.de.whitespace_or_eof()? {
             b'=' => {
                 self.de.advance(); // Skip the equals sign
