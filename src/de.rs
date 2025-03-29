@@ -14,12 +14,16 @@ pub struct Deserializer<'de> {
 
 impl<'de> Deserializer<'de> {
     /// Refer to the `Deserializer::from_str` method for more info.
-    pub fn from_str(input: &'de str) -> Self {
-        Self {
+    pub fn from_str(input: &'de str) -> Result<Self> {
+        let mut de = Self {
             bytes: input.as_bytes(),
             index: 0,
             variables: HashMap::new(),
-        }
+        };
+
+        de.parse_let_block()?;
+
+        Ok(de)
     }
 
     fn advance(&mut self) {
@@ -77,6 +81,82 @@ impl<'de> Deserializer<'de> {
 
         Ok(())
     }
+
+    fn parse_integer(&mut self, negative: bool) -> Result<i64> {
+        let next = self.whitespace_or_eof()?;
+
+        match next {
+            c @ b'1'..=b'9' => {
+                let mut significand = (c - b'0') as i64;
+
+                loop {
+                    match self.next()? {
+                        None => {
+                            break Ok(if negative {
+                                significand.wrapping_neg()
+                            } else {
+                                significand
+                            })
+                        }
+
+                        Some(integer @ b'0'..=b'9') => {
+                            let digit = (integer - b'0') as i64;
+
+                            significand = significand * 10 + digit;
+                        }
+
+                        Some(token) => return Err(Error::unexpected_token("", token, self.index)),
+                    }
+                }
+            }
+
+            _ => todo!(),
+        }
+    }
+
+    fn parse_let_block(&mut self) -> Result<()> {
+        match self.whitespace_or_eof()? {
+            b'{' => return Ok(()),
+            b'l' => {
+                self.parse_ident(b"let")?;
+
+                match self.whitespace_or_eof()? {
+                    b'{' => {
+                        self.advance();
+                        loop {
+                            match self.whitespace_or_eof()? {
+                                b'$' => {
+                                    unimplemented!("key parsing")
+                                }
+                                b'}' => {
+                                    self.advance();
+                                    break;
+                                }
+                                token => {
+                                    return Err(Error::unexpected_token(
+                                        "input definition or }",
+                                        token,
+                                        self.index,
+                                    ))
+                                }
+                            }
+                        }
+
+                        match self.whitespace_or_eof()? {
+                            b'i' => {
+                                self.parse_ident(b"in")?;
+                            }
+                            token => return Err(Error::unexpected_token("in", token, self.index)),
+                        }
+                    }
+                    token => return Err(Error::unexpected_token("{", token, self.index)),
+                }
+            }
+            token => return Err(Error::unexpected_token("one of: let, {", token, self.index)),
+        }
+
+        Ok(())
+    }
 }
 
 /// Deserializes a Corn-formatted string into a Rust type.
@@ -101,7 +181,7 @@ pub fn from_str<'a, T>(s: &'a str) -> Result<T, Error>
 where
     T: de::Deserialize<'a>,
 {
-    let mut deserializer = Deserializer::from_str(s);
+    let mut deserializer = Deserializer::from_str(s)?;
 
     T::deserialize(&mut deserializer)
 }
@@ -114,10 +194,6 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         V: de::Visitor<'de>,
     {
         match self.whitespace_or_eof()? {
-            b'l' => {
-                self.parse_ident(b"let")?;
-                unimplemented!("Let block")
-            }
             b'{' => {
                 self.advance();
                 visitor.visit_map(MapAccess::new(self))
@@ -200,7 +276,14 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        match self.whitespace_or_eof()? {
+            b'-' => {
+                self.advance();
+                visitor.visit_i64(self.parse_integer(true)?)
+            }
+            b'0'..=b'9' => visitor.visit_i64(self.parse_integer(false)?),
+            _ => todo!(),
+        }
     }
 
     fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -432,7 +515,10 @@ impl<'a, 'de> de::SeqAccess<'de> for SeqAccess<'a, 'de> {
     where
         T: de::DeserializeSeed<'de>,
     {
-        todo!()
+        match self.de.whitespace_or_eof()? {
+            b']' => Ok(None),
+            _ => seed.deserialize(&mut *self.de).map(Some),
+        }
     }
 }
 
