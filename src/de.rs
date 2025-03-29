@@ -114,6 +114,10 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         V: de::Visitor<'de>,
     {
         match self.whitespace_or_eof()? {
+            b'l' => {
+                self.parse_ident(b"let")?;
+                unimplemented!("Let block")
+            }
             b'{' => {
                 self.advance();
                 visitor.visit_map(MapAccess::new(self))
@@ -280,14 +284,26 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        match self.parse_whitespace()? {
+            Some(b'n') => {
+                self.parse_ident(b"null")?;
+                visitor.visit_none()
+            }
+            _ => visitor.visit_some(self),
+        }
     }
 
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        match self.whitespace_or_eof()? {
+            b'n' => {
+                self.parse_ident(b"null")?;
+                visitor.visit_unit()
+            }
+            token => Err(Error::unexpected_token("null", token, self.index)),
+        }
     }
 
     fn deserialize_unit_struct<V>(
@@ -316,7 +332,13 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        match self.whitespace_or_eof()? {
+            b'[' => {
+                self.advance();
+                visitor.visit_seq(SeqAccess::new(self))
+            }
+            token => Err(Error::unexpected_token("[", token, self.index)),
+        }
     }
 
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
@@ -342,7 +364,13 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        match self.whitespace_or_eof()? {
+            b'{' => {
+                self.advance();
+                visitor.visit_map(MapAccess::new(self))
+            }
+            token => Err(Error::unexpected_token("{", token, self.index)),
+        }
     }
 
     fn deserialize_struct<V>(
