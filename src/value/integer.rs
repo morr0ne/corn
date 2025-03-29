@@ -46,7 +46,7 @@ impl From<u64> for Integer {
 impl Integer {
     pub const fn is_i64(&self) -> bool {
         match self.inner {
-            IntegerType::Positive(n) => n <= i64::max_value() as u64,
+            IntegerType::Positive(n) => n <= i64::MAX as u64,
             IntegerType::Negative(_) => true,
         }
     }
