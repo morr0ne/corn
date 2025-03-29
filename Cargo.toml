@@ -10,7 +10,10 @@ description = "Parsing engine for Corn, a simple and pain-free configuration lan
 repository = "https://github.com/JakeStanger/corn"
 categories = ["config", "parsing"]
 keywords = ["configuration", "language", "wasm", "peg"]
-authors = ["Jake Stanger <mail@jakestanger.com>"]
+authors = [
+    "Jake Stanger <mail@jakestanger.com>",
+    "Matilde Morrone <contact@morrone.dev>",
+]
 homepage = "https://cornlang.dev/"
 documentation = "https://docs.rs/libcorn"
 readme = "README.md"
