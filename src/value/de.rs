@@ -1,18 +1,6 @@
-use indexmap::IndexMap;
-use serde::{de::Visitor, Deserialize, Serialize};
+use serde::{de::Visitor, Deserialize};
 
-pub type Object = IndexMap<String, Value>;
-
-#[derive(Debug, Clone)]
-pub enum Value {
-    String(String),
-    Integer(i64), // FIXME: Use a custom number wrapper to handle both signed and unsigned integers
-    Float(f64),
-    Boolean(bool),
-    Object(Object),
-    Array(Vec<Value>),
-    Null,
-}
+use crate::{Object, Value};
 
 impl<'de> Deserialize<'de> for Value {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -114,32 +102,5 @@ impl<'de> Deserialize<'de> for Value {
         }
 
         deserializer.deserialize_any(ValueVisitor)
-    }
-}
-
-impl Serialize for Value {
-    #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Self::String(s) => serializer.serialize_str(s),
-            Self::Integer(i) => i.serialize(serializer),
-            Self::Float(f) => f.serialize(serializer),
-            Self::Boolean(v) => serializer.serialize_bool(*v),
-            Self::Object(obj) => {
-                use serde::ser::SerializeMap;
-                let mut map = serializer.serialize_map(Some(obj.len()))?;
-
-                for (k, v) in obj {
-                    map.serialize_entry(k, v)?;
-                }
-
-                map.end()
-            }
-            Self::Array(v) => v.serialize(serializer),
-            Self::Null => serializer.serialize_unit(),
-        }
     }
 }
