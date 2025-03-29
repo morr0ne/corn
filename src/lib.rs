@@ -1,3 +1,5 @@
+#![warn(missing_docs)]
+
 #[cfg(any(
     feature = "lua51",
     feature = "lua52",
