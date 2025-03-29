@@ -29,7 +29,15 @@ impl<'de> Deserialize<'de> for Value {
             where
                 E: serde::de::Error,
             {
-                Ok(Value::Integer(v))
+                Ok(Value::Integer(v.into()))
+            }
+
+            #[inline]
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Value::Integer(v.into()))
             }
 
             fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
