@@ -12,6 +12,8 @@ pub enum Error {
     /// Indicates an unexpected end of input during parsing.
     Eof,
 
+    InvalidUtf8,
+
     /// Indicates that an unexpected token was encountered during parsing.
     UnexpectedToken {
         /// Description of what was expected at this position
@@ -42,6 +44,7 @@ impl Display for Error {
         match self {
             Self::Io(e) => e.fmt(f),
             Self::Eof => write!(f, "Unexpected end of input"),
+            Self::InvalidUtf8 => todo!(),
             Self::UnexpectedToken {
                 expected,
                 found,

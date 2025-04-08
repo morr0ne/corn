@@ -339,7 +339,32 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        match self.whitespace_or_eof()? {
+            b'"' => {
+                self.advance();
+
+                let start = self.index;
+
+                loop {
+                    match self.next()? {
+                        Some(byte) => {
+                            if byte == b'"' {
+                                break;
+                            }
+                        }
+                        None => return Err(Error::Eof),
+                    }
+                }
+
+                let end = self.index;
+
+                let string =
+                    std::str::from_utf8(&self.bytes[start..end]).map_err(|_| Error::InvalidUtf8)?;
+
+                visitor.visit_str(string)
+            }
+            _ => todo!(),
+        }
     }
 
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -547,7 +572,7 @@ impl<'a, 'de> de::MapAccess<'de> for MapAccess<'a, 'de> {
             b'\'' => {
                 todo!()
             }
-            token => {
+            _ => {
                 let start = self.de.index;
 
                 loop {
