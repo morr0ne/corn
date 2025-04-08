@@ -360,7 +360,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                     }
                 }
 
-                let end = self.index;
+                let end = self.index - 1;
 
                 let string =
                     std::str::from_utf8(&self.bytes[start..end]).map_err(|_| Error::InvalidUtf8)?;
