@@ -187,6 +187,7 @@ where
 }
 
 // TODO: more specialized number parsing
+// TODO: extract parsing logic from deserializer
 impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     type Error = Error;
 
@@ -194,6 +195,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
+        // TODO: evaluate if forwarding method is correct
         match self.whitespace_or_eof()? {
             b'n' => {
                 self.parse_ident(b"null")?;
@@ -207,15 +209,9 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 self.parse_ident(b"false")?;
                 visitor.visit_bool(false)
             }
-            b'-' => {
-                unimplemented!("Negative number")
-            }
-            b'0'..=b'9' => {
-                unimplemented!("Number parsing")
-            }
-            b'"' => {
-                unimplemented!("String parsing")
-            }
+            b'-' => self.deserialize_i64(visitor),
+            b'0'..=b'9' => self.deserialize_u64(visitor),
+            b'"' => self.deserialize_str(visitor),
             b'[' => {
                 self.advance();
                 visitor.visit_seq(SeqAccess::new(self))
