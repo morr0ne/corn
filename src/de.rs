@@ -84,6 +84,7 @@ impl<'de> Deserializer<'de> {
 
     fn parse_integer(&mut self, negative: bool) -> Result<i64> {
         let next = self.whitespace_or_eof()?;
+        self.advance();
 
         match next {
             c @ b'1'..=b'9' => {
@@ -91,13 +92,8 @@ impl<'de> Deserializer<'de> {
 
                 loop {
                     match self.next()? {
-                        None => {
-                            break Ok(if negative {
-                                significand.wrapping_neg()
-                            } else {
-                                significand
-                            })
-                        }
+                        Some(token) if token.is_ascii_whitespace() => break,
+                        None => break,
 
                         Some(integer @ b'0'..=b'9') => {
                             let digit = (integer - b'0') as i64;
@@ -105,11 +101,18 @@ impl<'de> Deserializer<'de> {
                             significand = significand * 10 + digit;
                         }
 
-                        Some(token) => return Err(Error::unexpected_token("", token, self.index)),
+                        Some(token) => {
+                            return Err(Error::unexpected_token("integer", token, self.index))
+                        }
                     }
                 }
-            }
 
+                return Ok(if negative {
+                    significand.wrapping_neg()
+                } else {
+                    significand
+                });
+            }
             _ => todo!(),
         }
     }
@@ -209,8 +212,11 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 self.parse_ident(b"false")?;
                 visitor.visit_bool(false)
             }
-            b'-' => self.deserialize_i64(visitor),
-            b'0'..=b'9' => self.deserialize_u64(visitor),
+            b'-' => {
+                self.advance();
+                visitor.visit_i64(self.parse_integer(true)?)
+            }
+            b'0'..=b'9' => visitor.visit_i64(self.parse_integer(false)?),
             b'"' => self.deserialize_str(visitor),
             b'[' => {
                 self.advance();
@@ -221,8 +227,9 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 visitor.visit_map(MapAccess::new(self))
             }
             token => Err(Error::unexpected_token(
-                "one of: ", // FIXME: include more info
-                token, self.index,
+                "one of: any", // FIXME: include more info
+                token,
+                self.index,
             )),
         }
     }
@@ -538,7 +545,10 @@ impl<'a, 'de> de::SeqAccess<'de> for SeqAccess<'a, 'de> {
         T: de::DeserializeSeed<'de>,
     {
         match self.de.whitespace_or_eof()? {
-            b']' => Ok(None),
+            b']' => {
+                self.de.advance();
+                return Ok(None);
+            }
             _ => seed.deserialize(&mut *self.de).map(Some),
         }
     }
