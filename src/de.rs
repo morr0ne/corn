@@ -194,14 +194,6 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         V: de::Visitor<'de>,
     {
         match self.whitespace_or_eof()? {
-            b'{' => {
-                self.advance();
-                visitor.visit_map(MapAccess::new(self))
-            }
-            b'[' => {
-                self.advance();
-                visitor.visit_seq(SeqAccess::new(self))
-            }
             b'n' => {
                 self.parse_ident(b"null")?;
                 visitor.visit_unit()
@@ -222,6 +214,14 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             }
             b'"' => {
                 unimplemented!("String parsing")
+            }
+            b'[' => {
+                self.advance();
+                visitor.visit_seq(SeqAccess::new(self))
+            }
+            b'{' => {
+                self.advance();
+                visitor.visit_map(MapAccess::new(self))
             }
             token => Err(Error::unexpected_token(
                 "one of: ", // FIXME: include more info
