@@ -410,6 +410,7 @@ dependencies = [
  "criterion",
  "indexmap",
  "itoa",
+ "memchr",
  "mlua",
  "paste",
  "serde",
