@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use serde::{de, forward_to_deserialize_any};
+use serde::{de, forward_to_deserialize_any, Deserialize};
 
 use crate::{Error, Result, Value};
 
@@ -146,7 +146,50 @@ impl<'de> Deserializer<'de> {
                         loop {
                             match self.whitespace_or_eof()? {
                                 b'$' => {
-                                    unimplemented!("key parsing")
+                                    self.advance();
+
+                                    let start = self.index;
+
+                                    loop {
+                                        match self.peek()? {
+                                            Some(byte) => {
+                                                if byte.is_ascii_whitespace() {
+                                                    break;
+                                                }
+
+                                                // FIXME: check the input is alphanumeric
+                                                // FIXME: check the inputs starts with a letter
+
+                                                self.advance();
+                                            }
+                                            None => break,
+                                        }
+                                    }
+
+                                    let end = self.index;
+
+                                    if start == end {
+                                        // return Err(Error::EmptyKey);
+                                    }
+
+                                    // TODO: better error handling
+                                    let input = std::str::from_utf8(&self.bytes[start..end])
+                                        .map_err(|_| Error::InvalidUtf8)?;
+
+                                    match self.whitespace_or_eof()? {
+                                        b'=' => {
+                                            self.advance(); // Skip the equals sign
+
+                                            let value = Value::deserialize(&mut *self)?;
+
+                                            self.variables.insert(input.to_owned(), value);
+                                        }
+                                        token => {
+                                            return Err(Error::unexpected_token(
+                                                "=", token, self.index,
+                                            ))
+                                        }
+                                    }
                                 }
                                 b'}' => {
                                     self.advance();
