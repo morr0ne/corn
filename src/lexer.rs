@@ -6,6 +6,8 @@ use thiserror::Error;
 
 use logos::{Logos, SpannedIter};
 
+use crate::Integer;
+
 pub type Spanned<Tok, Loc, Error> = Result<(Loc, Tok, Loc), Error>;
 
 pub struct Lexer<'input> {
@@ -82,9 +84,9 @@ pub enum Token {
     #[regex(r#""[^"]*""#, |lex| lex.slice().trim_matches('"').to_string())]
     StringLiteral(String),
 
-    // FIXME: better parsing of integers
-    #[regex(r"-?[0-9]+(_[0-9]+)*", |lex| lex.slice().replace("_", "").parse::<i64>())]
-    Integer(i64),
+    #[regex(r"-[0-9]+(_[0-9]+)*", |lex| lex.slice().replace("_", "").parse::<i64>().map(Integer::from))]
+    #[regex(r"[0-9]+(_[0-9]+)*", |lex| lex.slice().replace("_", "").parse::<u64>().map(Integer::from))]
+    Integer(Integer),
 
     #[regex(r"-?[0-9]+\.[0-9]*([eE][+-]?[0-9]+)?", |lex| lex.slice().parse::<f64>())]
     Float(f64),
