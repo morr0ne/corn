@@ -389,6 +389,7 @@ dependencies = [
  "anyhow",
  "criterion",
  "indexmap",
+ "itoa",
  "mlua",
  "serde",
  "serde_bytes",
