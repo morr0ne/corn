@@ -1,0 +1,87 @@
+use crate::ast::{Root, Entry, Object, Inputs, PairOrSpread, ChainedKey};
+use crate::lexer::{LexicalError, Token};
+use crate::Integer;
+
+grammar;
+
+extern {
+    type Location = usize;
+    type Error = LexicalError;
+
+    enum Token {
+      "let" => Token::Let,
+      "in" => Token::In,
+      "null" => Token::Null,
+      "=" => Token::Equals,
+      "{" => Token::OpenBrace,
+      "}" => Token::CloseBrace,
+      "[" => Token::OpenBracket,
+      "]" => Token::CloseBracket,
+      "." => Token::Chain,
+      ".." => Token::Spread,
+      "literal" => Token::StringLiteral(<String>),
+      "int" => Token::Integer(<Integer>),
+      "float" => Token::Float(<f64>),
+      "bool" => Token::Boolean(<bool>),
+      "input" => Token::InputName(<String>),
+      "key" => Token::Key(<String>),
+    }
+}
+
+pub Root: Root = {
+    <inputs:LetBlock?> <object:Object> => {
+        Root {
+            inputs: inputs.unwrap_or_default(),
+            object,
+        }
+    }
+}
+
+LetBlock: Inputs = {
+    "let" "{" <inputs:(<InputDeclaration>)*> "}" "in" => inputs.into_iter().collect()
+};
+
+InputDeclaration: (String, Entry) = {
+    <name:"input"> "=" <entry:Entry> => (name, entry),
+};
+
+Entry: Entry = {
+    "literal" => Entry::String(<>),
+    "int" => Entry::Integer(<>),
+    "float" => Entry::Float(<>),
+    "bool" => Entry::Boolean(<>),
+    Object => Entry::Object(<>),
+    Array => Entry::Array(<>),
+    "null" => Entry::Null,
+    "input" => Entry::Input(<>),
+}
+
+Object: Object = {
+    "{" <pairs:(<Pair>)*> "}" => {
+        Object {
+            pairs,
+        }
+    }
+};
+
+Pair: PairOrSpread = {
+    <k:KeyPath> "=" <v:Entry> => PairOrSpread::Pair(k, v),
+    ".." <name:"input"> => PairOrSpread::Spread(name),
+};
+
+KeyPath: ChainedKey = {
+    <first:"key"> <rest:("." <"key">)*> => {
+        ChainedKey {
+            segments: [vec![first], rest].concat()
+        }
+    }
+};
+
+Array: Vec<Entry> = {
+    "[" <entries:ArrayEntry*> "]" => entries,
+};
+
+ArrayEntry: Entry = {
+    Entry => <>,
+    ".." <name:"input"> => Entry::Spread(name),
+};

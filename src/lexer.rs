@@ -81,25 +81,35 @@ pub enum Token {
     #[token("..")]
     Spread,
 
-    #[regex(r#""[^"]*""#, |lex| lex.slice().trim_matches('"').to_string())]
-    StringLiteral(String),
+    #[token("false", |_| false)]
+    #[token("true", |_| true)]
+    Boolean(bool),
 
     #[regex(r"-[0-9]+(_[0-9]+)*", |lex| lex.slice().replace("_", "").parse::<i64>().map(Integer::from))]
     #[regex(r"[0-9]+(_[0-9]+)*", |lex| lex.slice().replace("_", "").parse::<u64>().map(Integer::from))]
+    // FIXME: this is a mess sob
+    #[regex(r"0x[0-9a-fA-F][_0-9a-fA-F]*", |lex| i64::from_str_radix(&lex.slice().trim_start_matches("0x").replace("_", ""), 16).map(Integer::from))]
     Integer(Integer),
 
     #[regex(r"-?[0-9]+\.[0-9]*([eE][+-]?[0-9]+)?", |lex| lex.slice().parse::<f64>())]
     Float(f64),
 
-    #[token("false", |_| false)]
-    #[token("true", |_| true)]
-    Boolean(bool),
-
     #[regex(r"\$[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
     InputName(String),
 
-    #[regex(r"'[^']*'|[^\s.=0-9\[\]{}-][^\s.=]*", |lex| lex.slice().trim_matches('\'').to_string())]
+    #[regex(r#""(?:[^"\\]|\\[\\\"nrt$]|\\u[0-9a-fA-F]{4})*""#, |lex| lex.slice().trim_matches('"').to_string())]
+    StringLiteral(String),
+
+    InterpolatedString(Vec<StringPart>), // FIXME: parse interpolated strings
+
+    #[regex(r#"'(?:[^'\\]|\\.)*'|[^\s.=0-9\[\]{}"'][^\s.=\[\]{}"']*"#, |lex| lex.slice().trim_matches('\'').to_string())]
     Key(String),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum StringPart {
+    Literal(String),
+    Input(String),
 }
 
 impl fmt::Display for Token {
@@ -116,6 +126,16 @@ impl fmt::Display for Token {
             Self::Chain => write!(f, "."),
             Self::Spread => write!(f, ".."),
             Self::StringLiteral(lit) => lit.fmt(f),
+            Self::InterpolatedString(parts) => {
+                for part in parts {
+                    match part {
+                        StringPart::Literal(lit) => write!(f, "{lit}")?,
+                        StringPart::Input(input) => write!(f, "${input}")?,
+                    }
+                }
+
+                Ok(())
+            }
             Self::Integer(int) => int.fmt(f),
             Self::Float(float) => float.fmt(f),
             Self::Boolean(bool) => bool.fmt(f),
