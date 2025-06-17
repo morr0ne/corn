@@ -5,6 +5,7 @@ mod integer;
 mod ser;
 
 pub use integer::Integer;
+pub(crate) use integer::IntegerType;
 
 /// Object: Key-value collection that preserves insertion order
 pub type Object = IndexMap<String, Value>;

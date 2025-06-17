@@ -10,7 +10,7 @@ mod de;
 mod lua;
 
 mod error;
-mod value;
+pub(crate) mod value;
 
 pub mod ast;
 pub mod lexer;
