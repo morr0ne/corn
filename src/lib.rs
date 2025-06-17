@@ -7,7 +7,6 @@
 // pub use crate::de::{from_slice, from_str};
 // pub use crate::parser::{parse, Rule};
 
-// pub mod error;
 // mod parser;
 
 // mod de;
@@ -23,30 +22,18 @@
 // #[cfg(feature = "wasm")]
 // mod wasm;
 
-
 lalrpop_util::lalrpop_mod!(pub parser, "/corn.rs");
 
-
+mod error;
 mod value;
+
+pub use error::{Error, Result};
 
 pub mod ast;
 pub mod lexer;
 
-use std::fmt::Display;
-
 pub use value::{Integer, Object, Value};
 
-#[derive(Debug)]
-pub struct Error;
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
-}
-
-impl std::error::Error for Error {}
-
-pub fn parse(file: &str) -> Result<Value, Error> {
+pub fn parse(_file: &str) -> Result<Value, Error> {
     todo!()
 }
