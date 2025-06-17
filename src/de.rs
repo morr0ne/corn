@@ -8,27 +8,65 @@ use crate::{
     lexer::Lexer,
     parser::RootParser,
     value::IntegerType,
-    Error, Integer, Result,
+    Error, Integer, Result, Value,
 };
 
 #[derive(Clone)]
 pub struct Deserializer<'de> {
-    entry: ResolvedEntry<'de>,
+    entry: BorrowedValue<'de>,
 }
 
 #[derive(Clone)]
-enum ResolvedEntry<'input> {
+pub enum BorrowedValue<'input> {
     String(Cow<'input, str>),
     Integer(Integer),
     Float(f64),
     Boolean(bool),
     Null,
-    Array(Vec<ResolvedEntry<'input>>),
-    Object(IndexMap<&'input str, ResolvedEntry<'input>>),
+    Array(Vec<BorrowedValue<'input>>),
+    Object(IndexMap<&'input str, BorrowedValue<'input>>),
+}
+
+impl BorrowedValue<'_> {
+    pub fn into_value(self) -> Value {
+        match self {
+            BorrowedValue::String(string) => Value::String(string.into_owned()),
+            BorrowedValue::Integer(integer) => Value::Integer(integer),
+            BorrowedValue::Float(float) => Value::Float(float),
+            BorrowedValue::Boolean(boolean) => Value::Boolean(boolean),
+            BorrowedValue::Null => Value::Null,
+            BorrowedValue::Array(array) => {
+                Value::Array(array.into_iter().map(Value::from).collect())
+            }
+            BorrowedValue::Object(object) => Value::Object(
+                object
+                    .into_iter()
+                    .map(|(k, v)| (k.to_owned(), Value::from(v)))
+                    .collect(),
+            ),
+        }
+    }
+}
+
+impl From<BorrowedValue<'_>> for Value {
+    fn from(entry: BorrowedValue<'_>) -> Self {
+        entry.into_value()
+    }
+}
+
+pub fn parse(input: &str) -> Result<BorrowedValue> {
+    Deserializer::parse(input)
 }
 
 impl<'de> Deserializer<'de> {
-    /// Refer to the `Deserializer::from_str` method for more info.
+    pub fn parse(input: &str) -> Result<BorrowedValue> {
+        let mut lexer = Lexer::new(input);
+        let parser = RootParser::new();
+        let Root { inputs, object } = parser.parse(input, &mut lexer).expect("Failed to parse"); // FIXME: handler errors
+
+        Self::resolve_entry(&Entry::Object(object), &inputs)
+    }
+
     pub fn from_str(input: &'de str) -> Result<Self> {
         let mut lexer = Lexer::new(input);
         let parser = RootParser::new();
@@ -39,19 +77,19 @@ impl<'de> Deserializer<'de> {
         })
     }
 
-    fn with_entry(entry: ResolvedEntry<'de>) -> Self {
+    fn with_entry(entry: BorrowedValue<'de>) -> Self {
         Self { entry }
     }
 
     fn resolve_entry<'input>(
         entry: &Entry<'input>,
         inputs: &Inputs<'input>,
-    ) -> Result<ResolvedEntry<'input>> {
+    ) -> Result<BorrowedValue<'input>> {
         match entry {
-            Entry::String(s) => Ok(ResolvedEntry::String(Cow::Borrowed(s))), // TODO: handle interpolation here or at lexer level?
-            Entry::Integer(integer) => Ok(ResolvedEntry::Integer(*integer)),
-            Entry::Float(float) => Ok(ResolvedEntry::Float(*float)),
-            Entry::Boolean(boolean) => Ok(ResolvedEntry::Boolean(*boolean)),
+            Entry::String(s) => Ok(BorrowedValue::String(Cow::Borrowed(s))), // TODO: handle interpolation here or at lexer level?
+            Entry::Integer(integer) => Ok(BorrowedValue::Integer(*integer)),
+            Entry::Float(float) => Ok(BorrowedValue::Float(*float)),
+            Entry::Boolean(boolean) => Ok(BorrowedValue::Boolean(*boolean)),
             Entry::Object(obj) => {
                 let mut resolved_object = IndexMap::new();
 
@@ -67,7 +105,7 @@ impl<'de> Deserializer<'de> {
                         PairOrSpread::Spread(name) => {
                             if let Some(spread_entry) = inputs.get(name) {
                                 match Self::resolve_entry(spread_entry, inputs)? {
-                                    ResolvedEntry::Object(spread_obj) => {
+                                    BorrowedValue::Object(spread_obj) => {
                                         for (k, v) in spread_obj {
                                             resolved_object.insert(k, v);
                                         }
@@ -89,7 +127,7 @@ impl<'de> Deserializer<'de> {
                     }
                 }
 
-                Ok(ResolvedEntry::Object(resolved_object))
+                Ok(BorrowedValue::Object(resolved_object))
             }
             Entry::Array(items) => {
                 let mut resolved_array = Vec::with_capacity(items.len()); // We need at least the same amount of items
@@ -101,7 +139,7 @@ impl<'de> Deserializer<'de> {
                         }
                         EntryOrSpread::Spread(spread) => match Self::resolve_input(spread, inputs)?
                         {
-                            ResolvedEntry::Array(array) => {
+                            BorrowedValue::Array(array) => {
                                 resolved_array.extend(array);
                             }
                             _ => panic!("Only arrays support being spreaded"), // FIXME: return an error
@@ -109,17 +147,17 @@ impl<'de> Deserializer<'de> {
                     }
                 }
 
-                Ok(ResolvedEntry::Array(resolved_array))
+                Ok(BorrowedValue::Array(resolved_array))
             }
-            Entry::Null => Ok(ResolvedEntry::Null),
+            Entry::Null => Ok(BorrowedValue::Null),
             Entry::Input(input) => Self::resolve_input(input, inputs),
         }
     }
 
     fn insert_at_path<'input>(
-        obj: &mut IndexMap<&'input str, ResolvedEntry<'input>>,
+        obj: &mut IndexMap<&'input str, BorrowedValue<'input>>,
         path: &[&'input str],
-        value: ResolvedEntry<'input>,
+        value: BorrowedValue<'input>,
     ) -> Result<(), Error> {
         if path.is_empty() {
             return Err(Error::DeserializationError("Empty path".to_string()));
@@ -133,10 +171,10 @@ impl<'de> Deserializer<'de> {
         let (first, rest) = path.split_first().unwrap();
         let entry = obj
             .entry(first)
-            .or_insert_with(|| ResolvedEntry::Object(indexmap::IndexMap::new()));
+            .or_insert_with(|| BorrowedValue::Object(indexmap::IndexMap::new()));
 
         match entry {
-            ResolvedEntry::Object(nested_obj) => {
+            BorrowedValue::Object(nested_obj) => {
                 Self::insert_at_path(nested_obj, rest, value)?;
             }
             _ => {
@@ -153,10 +191,10 @@ impl<'de> Deserializer<'de> {
     fn resolve_input<'input>(
         input: &str,
         inputs: &Inputs<'input>,
-    ) -> Result<ResolvedEntry<'input>> {
+    ) -> Result<BorrowedValue<'input>> {
         if let Some(env) = input.strip_prefix("$env_") {
             if let Ok(env) = std::env::var(env) {
-                return Ok(ResolvedEntry::String(Cow::Owned(env)));
+                return Ok(BorrowedValue::String(Cow::Owned(env)));
             }
         }
 
@@ -185,21 +223,21 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         V: de::Visitor<'de>,
     {
         match self.entry {
-            ResolvedEntry::String(ref string) => visitor.visit_str(string),
-            ResolvedEntry::Integer(integer) => match integer.inner {
+            BorrowedValue::String(ref string) => visitor.visit_str(string),
+            BorrowedValue::Integer(integer) => match integer.inner {
                 IntegerType::Negative(n) => visitor.visit_i64(n),
                 IntegerType::Positive(n) => visitor.visit_u64(n),
             },
-            ResolvedEntry::Float(float) => visitor.visit_f64(float),
-            ResolvedEntry::Boolean(boolean) => visitor.visit_bool(boolean),
-            ResolvedEntry::Null => visitor.visit_unit(),
-            ResolvedEntry::Array(ref mut items) => {
+            BorrowedValue::Float(float) => visitor.visit_f64(float),
+            BorrowedValue::Boolean(boolean) => visitor.visit_bool(boolean),
+            BorrowedValue::Null => visitor.visit_unit(),
+            BorrowedValue::Array(ref mut items) => {
                 let mut seq = Vec::new();
                 std::mem::swap(items, &mut seq);
 
                 visitor.visit_seq(SeqAccess::new(seq))
             }
-            ResolvedEntry::Object(ref mut object) => {
+            BorrowedValue::Object(ref mut object) => {
                 let mut map = IndexMap::new();
                 std::mem::swap(object, &mut map);
 
@@ -216,11 +254,11 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
 }
 
 struct SeqAccess<'de> {
-    items: std::vec::IntoIter<ResolvedEntry<'de>>,
+    items: std::vec::IntoIter<BorrowedValue<'de>>,
 }
 
 impl<'de> SeqAccess<'de> {
-    pub fn new(items: Vec<ResolvedEntry<'de>>) -> Self {
+    pub fn new(items: Vec<BorrowedValue<'de>>) -> Self {
         Self {
             items: items.into_iter(),
         }
@@ -245,12 +283,12 @@ impl<'de> de::SeqAccess<'de> for SeqAccess<'de> {
 }
 
 struct MapAccess<'de> {
-    items: indexmap::map::IntoIter<&'de str, ResolvedEntry<'de>>,
-    current_value: Option<ResolvedEntry<'de>>,
+    items: indexmap::map::IntoIter<&'de str, BorrowedValue<'de>>,
+    current_value: Option<BorrowedValue<'de>>,
 }
 
 impl<'de> MapAccess<'de> {
-    fn new(items: IndexMap<&'de str, ResolvedEntry<'de>>) -> Self {
+    fn new(items: IndexMap<&'de str, BorrowedValue<'de>>) -> Self {
         Self {
             items: items.into_iter(),
             current_value: None,
@@ -269,7 +307,7 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
             Some((key, value)) => {
                 self.current_value = Some(value);
                 let mut key_deserializer =
-                    Deserializer::with_entry(ResolvedEntry::String(Cow::Borrowed(key)));
+                    Deserializer::with_entry(BorrowedValue::String(Cow::Borrowed(key)));
                 seed.deserialize(&mut key_deserializer).map(Some)
             }
             None => Ok(None),
