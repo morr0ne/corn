@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use indexmap::IndexMap;
 
 mod de;
@@ -36,6 +38,44 @@ pub enum Value {
     Array(Vec<Value>),
     /// Represents the absence of a value
     Null,
+}
+
+#[derive(Clone)]
+pub enum BorrowedValue<'input> {
+    String(Cow<'input, str>),
+    Integer(Integer),
+    Float(f64),
+    Boolean(bool),
+    Null,
+    Array(Vec<BorrowedValue<'input>>),
+    Object(IndexMap<&'input str, BorrowedValue<'input>>),
+}
+
+impl BorrowedValue<'_> {
+    pub fn into_value(self) -> Value {
+        match self {
+            BorrowedValue::String(string) => Value::String(string.into_owned()),
+            BorrowedValue::Integer(integer) => Value::Integer(integer),
+            BorrowedValue::Float(float) => Value::Float(float),
+            BorrowedValue::Boolean(boolean) => Value::Boolean(boolean),
+            BorrowedValue::Null => Value::Null,
+            BorrowedValue::Array(array) => {
+                Value::Array(array.into_iter().map(Value::from).collect())
+            }
+            BorrowedValue::Object(object) => Value::Object(
+                object
+                    .into_iter()
+                    .map(|(k, v)| (k.to_owned(), Value::from(v)))
+                    .collect(),
+            ),
+        }
+    }
+}
+
+impl From<BorrowedValue<'_>> for Value {
+    fn from(entry: BorrowedValue<'_>) -> Self {
+        entry.into_value()
+    }
 }
 
 impl Value {

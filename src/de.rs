@@ -8,50 +8,12 @@ use crate::{
     lexer::Lexer,
     parser::RootParser,
     value::IntegerType,
-    Error, Integer, Result, Value,
+    BorrowedValue, Error, Result,
 };
 
 #[derive(Clone)]
 pub struct Deserializer<'de> {
     entry: BorrowedValue<'de>,
-}
-
-#[derive(Clone)]
-pub enum BorrowedValue<'input> {
-    String(Cow<'input, str>),
-    Integer(Integer),
-    Float(f64),
-    Boolean(bool),
-    Null,
-    Array(Vec<BorrowedValue<'input>>),
-    Object(IndexMap<&'input str, BorrowedValue<'input>>),
-}
-
-impl BorrowedValue<'_> {
-    pub fn into_value(self) -> Value {
-        match self {
-            BorrowedValue::String(string) => Value::String(string.into_owned()),
-            BorrowedValue::Integer(integer) => Value::Integer(integer),
-            BorrowedValue::Float(float) => Value::Float(float),
-            BorrowedValue::Boolean(boolean) => Value::Boolean(boolean),
-            BorrowedValue::Null => Value::Null,
-            BorrowedValue::Array(array) => {
-                Value::Array(array.into_iter().map(Value::from).collect())
-            }
-            BorrowedValue::Object(object) => Value::Object(
-                object
-                    .into_iter()
-                    .map(|(k, v)| (k.to_owned(), Value::from(v)))
-                    .collect(),
-            ),
-        }
-    }
-}
-
-impl From<BorrowedValue<'_>> for Value {
-    fn from(entry: BorrowedValue<'_>) -> Self {
-        entry.into_value()
-    }
 }
 
 pub fn parse(input: &str) -> Result<BorrowedValue> {
