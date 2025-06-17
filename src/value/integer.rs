@@ -2,6 +2,7 @@ use serde::Serialize;
 use std::fmt::{Debug, Display};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[repr(transparent)]
 pub struct Integer {
     inner: IntegerType,
 }
