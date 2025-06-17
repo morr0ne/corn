@@ -1,5 +1,3 @@
-extern crate core;
-
 use corn::parse;
 use paste::paste;
 use std::fs;
