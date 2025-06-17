@@ -4,7 +4,7 @@ use std::fmt::{Debug, Display};
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 #[repr(transparent)]
 pub struct Integer {
-    pub(crate)  inner: IntegerType,
+    pub(crate) inner: IntegerType,
 }
 
 impl Debug for Integer {
@@ -22,7 +22,7 @@ impl Display for Integer {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone,Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub(crate) enum IntegerType {
     Negative(i64),
     Positive(u64),
