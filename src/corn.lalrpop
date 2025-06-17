@@ -1,4 +1,4 @@
-use crate::ast::{Root, Entry, Object, Inputs, PairOrSpread, ChainedKey};
+use crate::ast::{Root, Entry, Object, Inputs, PairOrSpread, ChainedKey, EntryOrSpread};
 use crate::lexer::{LexicalError, Token};
 use crate::Integer;
 
@@ -77,11 +77,11 @@ KeyPath: ChainedKey<'input> = {
     }
 };
 
-Array: Vec<Entry<'input>> = {
+Array: Vec<EntryOrSpread<'input>> = {
     "[" <entries:ArrayEntry*> "]" => entries,
 };
 
-ArrayEntry: Entry<'input> = {
-    Entry => <>,
-    ".." <name:"input"> => Entry::Spread(name),
+ArrayEntry: EntryOrSpread<'input> = {
+    Entry => EntryOrSpread::Entry(<>),
+    ".." <name:"input"> => EntryOrSpread::Spread(name),
 };
