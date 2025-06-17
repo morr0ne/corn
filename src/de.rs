@@ -1,18 +1,173 @@
-use serde::{de, forward_to_deserialize_any, Deserialize};
+use std::borrow::Cow;
 
-use crate::{Error, Result};
+use indexmap::IndexMap;
+use serde::{de, forward_to_deserialize_any};
+
+use crate::{
+    ast::{Entry, EntryOrSpread, Inputs, PairOrSpread, Root},
+    lexer::Lexer,
+    parser::RootParser,
+    value::IntegerType,
+    Error, Integer, Result,
+};
 
 #[derive(Clone)]
 pub struct Deserializer<'de> {
-    bytes: &'de [u8],
+    entry: ResolvedEntry<'de>,
+}
+
+#[derive(Clone)]
+enum ResolvedEntry<'input> {
+    String(Cow<'input, str>),
+    Integer(Integer),
+    Float(f64),
+    Boolean(bool),
+    Null,
+    Array(Vec<ResolvedEntry<'input>>),
+    Object(IndexMap<&'input str, ResolvedEntry<'input>>),
 }
 
 impl<'de> Deserializer<'de> {
     /// Refer to the `Deserializer::from_str` method for more info.
     pub fn from_str(input: &'de str) -> Result<Self> {
-        todo!()
+        let mut lexer = Lexer::new(input);
+        let parser = RootParser::new();
+        let Root { inputs, object } = parser.parse(input, &mut lexer).expect("Failed to parse"); // FIXME: handler errors
+
+        Ok(Self {
+            entry: Self::resolve_entry(&Entry::Object(object), &inputs)?,
+        })
+    }
+
+    fn with_entry(entry: ResolvedEntry<'de>) -> Self {
+        Self { entry }
+    }
+
+    fn resolve_entry<'input>(
+        entry: &Entry<'input>,
+        inputs: &Inputs<'input>,
+    ) -> Result<ResolvedEntry<'input>> {
+        match entry {
+            Entry::String(s) => Ok(ResolvedEntry::String(Cow::Borrowed(s))), // TODO: handle interpolation here or at lexer level?
+            Entry::Integer(integer) => Ok(ResolvedEntry::Integer(*integer)),
+            Entry::Float(float) => Ok(ResolvedEntry::Float(*float)),
+            Entry::Boolean(boolean) => Ok(ResolvedEntry::Boolean(*boolean)),
+            Entry::Object(obj) => {
+                let mut resolved_object = IndexMap::new();
+
+                for pair_or_spread in &obj.pairs {
+                    match pair_or_spread {
+                        PairOrSpread::Pair(key, value) => {
+                            Self::insert_at_path(
+                                &mut resolved_object,
+                                &key.segments,
+                                Self::resolve_entry(value, inputs)?,
+                            )?;
+                        }
+                        PairOrSpread::Spread(name) => {
+                            if let Some(spread_entry) = inputs.get(name) {
+                                match Self::resolve_entry(spread_entry, inputs)? {
+                                    ResolvedEntry::Object(spread_obj) => {
+                                        for (k, v) in spread_obj {
+                                            resolved_object.insert(k, v);
+                                        }
+                                    }
+                                    _ => {
+                                        return Err(Error::DeserializationError(format!(
+                                            "Cannot spread non-object type: {}",
+                                            name
+                                        )))
+                                    }
+                                }
+                            } else {
+                                return Err(Error::DeserializationError(format!(
+                                    "Undefined input for spread: {}",
+                                    name
+                                )));
+                            }
+                        }
+                    }
+                }
+
+                Ok(ResolvedEntry::Object(resolved_object))
+            }
+            Entry::Array(items) => {
+                let mut resolved_array = Vec::with_capacity(items.len()); // We need at least the same amount of items
+
+                for entry in items {
+                    match entry {
+                        EntryOrSpread::Entry(entry) => {
+                            resolved_array.push(Self::resolve_entry(entry, inputs)?)
+                        }
+                        EntryOrSpread::Spread(spread) => match Self::resolve_input(spread, inputs)?
+                        {
+                            ResolvedEntry::Array(array) => {
+                                resolved_array.extend(array);
+                            }
+                            _ => panic!("Only arrays support being spreaded"), // FIXME: return an error
+                        },
+                    }
+                }
+
+                Ok(ResolvedEntry::Array(resolved_array))
+            }
+            Entry::Null => Ok(ResolvedEntry::Null),
+            Entry::Input(input) => Self::resolve_input(input, inputs),
+        }
+    }
+
+    fn insert_at_path<'input>(
+        obj: &mut IndexMap<&'input str, ResolvedEntry<'input>>,
+        path: &[&'input str],
+        value: ResolvedEntry<'input>,
+    ) -> Result<(), Error> {
+        if path.is_empty() {
+            return Err(Error::DeserializationError("Empty path".to_string()));
+        }
+
+        if path.len() == 1 {
+            obj.insert(path[0], value);
+            return Ok(());
+        }
+
+        let (first, rest) = path.split_first().unwrap();
+        let entry = obj
+            .entry(first)
+            .or_insert_with(|| ResolvedEntry::Object(indexmap::IndexMap::new()));
+
+        match entry {
+            ResolvedEntry::Object(nested_obj) => {
+                Self::insert_at_path(nested_obj, rest, value)?;
+            }
+            _ => {
+                return Err(Error::DeserializationError(format!(
+                    "Cannot index into non-object at key: {}",
+                    first
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn resolve_input<'input>(
+        input: &str,
+        inputs: &Inputs<'input>,
+    ) -> Result<ResolvedEntry<'input>> {
+        if let Some(env) = input.strip_prefix("$env_") {
+            if let Ok(env) = std::env::var(env) {
+                return Ok(ResolvedEntry::String(Cow::Owned(env)));
+            }
+        }
+
+        if let Some(entry) = inputs.get(input) {
+            return Self::resolve_entry(entry, inputs);
+        }
+
+        panic!("No input found") // FIXME: return an error
     }
 }
+
 pub fn from_str<'a, T>(s: &'a str) -> Result<T, Error>
 where
     T: de::Deserialize<'a>,
@@ -29,225 +184,110 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        match self.entry {
+            ResolvedEntry::String(ref string) => visitor.visit_str(string),
+            ResolvedEntry::Integer(integer) => match integer.inner {
+                IntegerType::Negative(n) => visitor.visit_i64(n),
+                IntegerType::Positive(n) => visitor.visit_u64(n),
+            },
+            ResolvedEntry::Float(float) => visitor.visit_f64(float),
+            ResolvedEntry::Boolean(boolean) => visitor.visit_bool(boolean),
+            ResolvedEntry::Null => visitor.visit_unit(),
+            ResolvedEntry::Array(ref mut items) => {
+                let mut seq = Vec::new();
+                std::mem::swap(items, &mut seq);
+
+                visitor.visit_seq(SeqAccess::new(seq))
+            }
+            ResolvedEntry::Object(ref mut object) => {
+                let mut map = IndexMap::new();
+                std::mem::swap(object, &mut map);
+
+                visitor.visit_map(MapAccess::new(map))
+            }
+        }
     }
 
-    fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf option unit unit_struct newtype_struct seq tuple
+        tuple_struct map struct enum identifier ignored_any
+    }
+}
+
+struct SeqAccess<'de> {
+    items: std::vec::IntoIter<ResolvedEntry<'de>>,
+}
+
+impl<'de> SeqAccess<'de> {
+    pub fn new(items: Vec<ResolvedEntry<'de>>) -> Self {
+        Self {
+            items: items.into_iter(),
+        }
+    }
+}
+
+impl<'de> de::SeqAccess<'de> for SeqAccess<'de> {
+    type Error = Error;
+
+    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
     where
-        V: de::Visitor<'de>,
+        T: de::DeserializeSeed<'de>,
     {
-        todo!()
+        match self.items.next() {
+            Some(item) => {
+                let mut deserializer = Deserializer::with_entry(item);
+                seed.deserialize(&mut deserializer).map(Some)
+            }
+            None => Ok(None),
+        }
+    }
+}
+
+struct MapAccess<'de> {
+    items: indexmap::map::IntoIter<&'de str, ResolvedEntry<'de>>,
+    current_value: Option<ResolvedEntry<'de>>,
+}
+
+impl<'de> MapAccess<'de> {
+    fn new(items: IndexMap<&'de str, ResolvedEntry<'de>>) -> Self {
+        Self {
+            items: items.into_iter(),
+            current_value: None,
+        }
+    }
+}
+
+impl<'de> de::MapAccess<'de> for MapAccess<'de> {
+    type Error = Error;
+
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+    where
+        K: de::DeserializeSeed<'de>,
+    {
+        match self.items.next() {
+            Some((key, value)) => {
+                self.current_value = Some(value);
+                let mut key_deserializer =
+                    Deserializer::with_entry(ResolvedEntry::String(Cow::Borrowed(key)));
+                seed.deserialize(&mut key_deserializer).map(Some)
+            }
+            None => Ok(None),
+        }
     }
 
-    fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
     where
-        V: de::Visitor<'de>,
+        V: de::DeserializeSeed<'de>,
     {
-        todo!()
-    }
-
-    fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_unit_struct<V>(
-        self,
-        name: &'static str,
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_newtype_struct<V>(
-        self,
-        name: &'static str,
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_tuple_struct<V>(
-        self,
-        name: &'static str,
-        len: usize,
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_struct<V>(
-        self,
-        name: &'static str,
-        fields: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_enum<V>(
-        self,
-        name: &'static str,
-        variants: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
-    }
-
-    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        todo!()
+        match self.current_value.take() {
+            Some(value) => {
+                let mut deserializer = Deserializer::with_entry(value);
+                seed.deserialize(&mut deserializer)
+            }
+            None => Err(Error::DeserializationError(
+                "No value available".to_string(),
+            )),
+        }
     }
 }
