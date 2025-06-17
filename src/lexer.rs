@@ -12,12 +12,11 @@ pub type Spanned<Tok, Loc, Error> = Result<(Loc, Tok, Loc), Error>;
 
 pub struct Lexer<'input> {
     // instead of an iterator over characters, we have a token iterator
-    token_stream: SpannedIter<'input, Token>,
+    token_stream: SpannedIter<'input, Token<'input>>,
 }
 
 impl<'input> Lexer<'input> {
     pub fn new(input: &'input str) -> Self {
-        // the Token::lexer() method is provided by the Logos trait
         Self {
             token_stream: Token::lexer(input).spanned(),
         }
@@ -25,7 +24,7 @@ impl<'input> Lexer<'input> {
 }
 
 impl<'input> Iterator for Lexer<'input> {
-    type Item = Spanned<Token, usize, LexicalError>;
+    type Item = Spanned<Token<'input>, usize, LexicalError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.token_stream
@@ -50,7 +49,7 @@ pub enum LexicalError {
 #[logos(skip r"[\s\t\r\n\f]+")] // Whitespace
 #[logos(skip r"//[^\n\r]*[\n\r]*")] // Inline comments
 #[logos(skip r"/\*([^*/]|\*[^/]|/[^*])*\*/")] // Multiline comments
-pub enum Token {
+pub enum Token<'input> {
     #[token("let")]
     Let,
 
@@ -94,16 +93,16 @@ pub enum Token {
     #[regex(r"-?[0-9]+\.[0-9]*([eE][+-]?[0-9]+)?", |lex| lex.slice().parse::<f64>())]
     Float(f64),
 
-    #[regex(r"\$[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
-    InputName(String),
+    #[regex(r"\$[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice())]
+    InputName(&'input str),
 
-    #[regex(r#""(?:[^"\\]|\\[\\\"nrt$]|\\u[0-9a-fA-F]{4})*""#, |lex| lex.slice().trim_matches('"').to_string())]
-    StringLiteral(String),
+    #[regex(r#""(?:[^"\\]|\\[\\\"nrt$]|\\u[0-9a-fA-F]{4})*""#, |lex| lex.slice().trim_matches('"'))]
+    StringLiteral(&'input str),
 
     InterpolatedString(Vec<StringPart>), // FIXME: parse interpolated strings
 
-    #[regex(r#"'(?:[^'\\]|\\.)*'|[^\s.=0-9\[\]{}"'][^\s.=\[\]{}"']*"#, |lex| lex.slice().trim_matches('\'').to_string())]
-    Key(String),
+    #[regex(r#"'(?:[^'\\]|\\.)*'|[^\s.=0-9\[\]{}"'][^\s.=\[\]{}"']*"#, |lex| lex.slice().trim_matches('\''))]
+    Key(&'input str),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -112,7 +111,7 @@ pub enum StringPart {
     Input(String),
 }
 
-impl fmt::Display for Token {
+impl fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Let => write!(f, "let"),
