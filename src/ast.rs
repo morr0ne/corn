@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::Integer;
+use crate::{lexer::StringPart, Integer};
 
 /// Store for input declarations
 pub type Inputs<'input> = HashMap<&'input str, Entry<'input>>;
@@ -41,7 +41,7 @@ pub struct ChainedKey<'input> {
 #[derive(Debug, Clone)]
 pub enum Entry<'input> {
     /// String literal
-    String(&'input str),
+    String(Vec<StringPart<'input>>),
     /// Integer value
     Integer(Integer),
     /// Float value

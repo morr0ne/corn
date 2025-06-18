@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     fmt,
     num::{ParseFloatError, ParseIntError},
 };
@@ -93,22 +94,124 @@ pub enum Token<'input> {
     #[regex(r"-?[0-9]+\.[0-9]*([eE][+-]?[0-9]+)?", |lex| lex.slice().parse::<f64>())]
     Float(f64),
 
-    #[regex(r"\$[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice())]
+    #[regex(r"\$[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().trim_start_matches('$'))]
     InputName(&'input str),
 
-    #[regex(r#""(?:[^"\\]|\\[\\\"nrt$]|\\u[0-9a-fA-F]{4})*""#, |lex| lex.slice().trim_matches('"'))]
-    StringLiteral(&'input str),
-
-    InterpolatedString(Vec<StringPart>), // FIXME: parse interpolated strings
+    #[token("\"", parse_literal)]
+    Literal(Vec<StringPart<'input>>),
 
     #[regex(r#"'(?:[^'\\]|\\.)*'|[^\s.=0-9\[\]{}"'][^\s.=\[\]{}"']*"#, |lex| lex.slice().trim_matches('\''))]
     Key(&'input str),
 }
 
+#[derive(Logos, Debug, PartialEq, Clone)]
+enum StringContext<'input> {
+    #[token("\"")]
+    Quote,
+    #[regex(r#"[^\"$\\{]+"#)]
+    Content,
+
+    #[token("\\n")]
+    NewlineEscape,
+    #[token("\\r")]
+    CarriageReturnEscape,
+    #[token("\\t")]
+    TabEscape,
+    #[token("\\\\")]
+    BackslashEscape,
+    #[token("\\\"")]
+    QuoteEscape,
+    #[token("\\$")]
+    DollarEscape,
+    #[token("\\{")]
+    OpenBraceEscape,
+    #[token("\\}")]
+    CloseBraceEscape,
+    #[regex(r"\\u[0-9a-fA-F]{4}")]
+    UnicodeEscape,
+
+    #[regex(r"\$\{[a-zA-Z_][a-zA-Z0-9_]*\}", |lex| lex.slice())]
+    Interpolation(&'input str),
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub enum StringPart {
-    Literal(String),
-    Input(String),
+pub enum StringPart<'input> {
+    Literal(Cow<'input, str>),
+    Input(&'input str),
+}
+
+fn parse_literal<'input>(
+    lex: &mut logos::Lexer<'input, Token<'input>>,
+) -> Option<Vec<StringPart<'input>>> {
+    let mut string_lex = lex.clone().morph::<StringContext>();
+
+    let mut parts = Vec::new();
+    let mut current_literal = String::new();
+
+    while let Some(Ok(token)) = string_lex.next() {
+        match token {
+            StringContext::Quote => break,
+            StringContext::Content => current_literal.push_str(string_lex.slice()),
+            StringContext::Interpolation(input) => {
+                if !current_literal.is_empty() {
+                    parts.push(StringPart::Literal(Cow::Owned(std::mem::take(
+                        &mut current_literal,
+                    ))));
+                }
+
+                parts.push(StringPart::Input(
+                    input.trim_start_matches("${").trim_end_matches('}'),
+                ))
+            }
+            StringContext::NewlineEscape => {
+                current_literal.push('\n');
+            }
+            StringContext::CarriageReturnEscape => {
+                current_literal.push('\r');
+            }
+            StringContext::TabEscape => {
+                current_literal.push('\t');
+            }
+            StringContext::BackslashEscape => {
+                current_literal.push('\\');
+            }
+            StringContext::QuoteEscape => {
+                current_literal.push('"');
+            }
+            StringContext::DollarEscape => {
+                current_literal.push('$');
+            }
+            StringContext::OpenBraceEscape => {
+                current_literal.push('{');
+            }
+            StringContext::CloseBraceEscape => {
+                current_literal.push('}');
+            }
+            StringContext::UnicodeEscape => {
+                let slice = string_lex.slice();
+                let hex_part = &slice[2..]; // Skip "\\u"
+
+                if let Ok(code) = u32::from_str_radix(hex_part, 16) {
+                    if let Some(unicode_char) = char::from_u32(code) {
+                        current_literal.push(unicode_char);
+                        continue;
+                    }
+                }
+
+                current_literal.push('\u{FFFD}');
+            }
+        }
+    }
+
+    if !current_literal.is_empty() {
+        parts.push(StringPart::Literal(Cow::Owned(std::mem::take(
+            &mut current_literal,
+        ))));
+    }
+
+    *lex = string_lex.morph();
+
+    Some(parts)
 }
 
 impl fmt::Display for Token<'_> {
@@ -124,12 +227,11 @@ impl fmt::Display for Token<'_> {
             Self::CloseBracket => write!(f, "]"),
             Self::Chain => write!(f, "."),
             Self::Spread => write!(f, ".."),
-            Self::StringLiteral(lit) => lit.fmt(f),
-            Self::InterpolatedString(parts) => {
+            Self::Literal(parts) => {
                 for part in parts {
                     match part {
                         StringPart::Literal(lit) => write!(f, "{lit}")?,
-                        StringPart::Input(input) => write!(f, "${input}")?,
+                        StringPart::Input(input) => write!(f, "{input}")?,
                     }
                 }
 
