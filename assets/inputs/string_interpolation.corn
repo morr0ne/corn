@@ -2,6 +2,6 @@ let {
     $greeting = "hello"
     $subject = "world"
 } in {
-    foo = "$greeting, $subject"
+    foo = "${greeting}, ${subject}"
     bar = "\$escaped"
 }
