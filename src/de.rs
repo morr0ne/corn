@@ -5,7 +5,7 @@ use serde::{de, forward_to_deserialize_any};
 
 use crate::{
     ast::{Entry, EntryOrSpread, Inputs, PairOrSpread, Root},
-    lexer::Lexer,
+    lexer::{Lexer, StringPart},
     parser::RootParser,
     value::IntegerType,
     BorrowedValue, Error, Result,
@@ -48,7 +48,29 @@ impl<'de> Deserializer<'de> {
         inputs: &Inputs<'input>,
     ) -> Result<BorrowedValue<'input>> {
         match entry {
-            Entry::String(s) => Ok(BorrowedValue::String(Cow::Borrowed(s))), // TODO: handle interpolation here or at lexer level?
+            Entry::String(parts) => {
+                if parts.is_empty() {
+                    return Ok(BorrowedValue::String(Cow::Borrowed("")));
+                }
+
+                let mut base = String::new();
+
+                for part in parts {
+                    match part {
+                        StringPart::Literal(lit) => base.push_str(lit),
+                        StringPart::Input(input) => {
+                            let input = Self::resolve_input(input, inputs)?;
+
+                            match input {
+                                BorrowedValue::String(string) => base.push_str(&string),
+                                _ => panic!("Only strings can be interpolated into string"), // FIXME: Custom error
+                            }
+                        }
+                    }
+                }
+
+                Ok(BorrowedValue::String(Cow::Owned(base)))
+            }
             Entry::Integer(integer) => Ok(BorrowedValue::Integer(*integer)),
             Entry::Float(float) => Ok(BorrowedValue::Float(*float)),
             Entry::Boolean(boolean) => Ok(BorrowedValue::Boolean(*boolean)),

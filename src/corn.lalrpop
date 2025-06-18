@@ -1,5 +1,5 @@
 use crate::ast::{Root, Entry, Object, Inputs, PairOrSpread, ChainedKey, EntryOrSpread};
-use crate::lexer::{LexicalError, Token};
+use crate::lexer::{LexicalError, Token, StringPart};
 use crate::Integer;
 
 grammar<'input>(input: &'input str);
@@ -19,7 +19,7 @@ extern {
       "]" => Token::CloseBracket,
       "." => Token::Chain,
       ".." => Token::Spread,
-      "literal" => Token::StringLiteral(<&'input str>),
+      "literal" => Token::Literal(<Vec<StringPart<'input>>>),
       "int" => Token::Integer(<Integer>),
       "float" => Token::Float(<f64>),
       "bool" => Token::Boolean(<bool>),
