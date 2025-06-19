@@ -100,8 +100,8 @@ pub enum Token<'input> {
     #[token("\"", parse_literal)]
     Literal(Vec<StringPart<'input>>),
 
-    #[regex(r#"'(?:[^'\\]|\\.)*'|[^\s.=0-9\[\]{}"'][^\s.=\[\]{}"']*"#, |lex| lex.slice().trim_matches('\''))]
-    Key(&'input str),
+    #[regex(r#"'(?:[^']|(\\'))*'|[^\s.=0-9\[\]{}"'][^\s.=\[\]{}"']*"#, |lex| lex.slice().trim_matches('\'').replace("\\'", "'"))]
+    Key(String),
 }
 
 #[derive(Logos, Debug, PartialEq, Clone)]

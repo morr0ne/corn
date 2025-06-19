@@ -24,7 +24,7 @@ extern {
       "float" => Token::Float(<f64>),
       "bool" => Token::Boolean(<bool>),
       "input" => Token::InputName(<&'input str>),
-      "key" => Token::Key(<&'input str>),
+      "key" => Token::Key(<String>),
     }
 }
 

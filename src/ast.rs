@@ -25,16 +25,16 @@ pub struct Object<'input> {
 #[derive(Debug, Clone)]
 pub enum PairOrSpread<'input> {
     /// A key-value pair in an object
-    Pair(ChainedKey<'input>, Entry<'input>),
+    Pair(ChainedKey, Entry<'input>),
     /// A spread operation in an object
     Spread(&'input str),
 }
 
 /// Represents a chained key like "foo.bar.baz"
 #[derive(Debug, Clone)]
-pub struct ChainedKey<'input> {
+pub struct ChainedKey {
     /// The segments of the key path
-    pub segments: Vec<&'input str>,
+    pub segments: Vec<String>,
 }
 
 /// An entry can be of various types as defined in the spec
