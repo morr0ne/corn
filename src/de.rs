@@ -7,7 +7,7 @@ use crate::{
     ast::{Entry, EntryOrSpread, Inputs, PairOrSpread, Root},
     lexer::{Lexer, StringPart},
     parser::RootParser,
-    BorrowedValue, Error, Result,
+    BorrowedObject, BorrowedValue, Error, Result,
 };
 
 #[derive(Clone)]
@@ -433,6 +433,12 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             BorrowedValue::String(ref string) => {
                 visitor.visit_enum(string.as_ref().into_deserializer())
             }
+            BorrowedValue::Object(ref mut object) => {
+                let mut map = IndexMap::new();
+                std::mem::swap(object, &mut map);
+
+                visitor.visit_enum(EnumAccess::new(map))
+            }
             ref value => Err(value.invalid_type("String or Object")),
         }
     }
@@ -525,6 +531,91 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
             None => Err(Error::DeserializationError(
                 "No value available".to_string(),
             )),
+        }
+    }
+}
+struct EnumAccess<'de> {
+    object: BorrowedObject<'de>,
+}
+
+impl<'de> EnumAccess<'de> {
+    fn new(object: BorrowedObject<'de>) -> Self {
+        Self { object }
+    }
+}
+
+impl<'de> de::EnumAccess<'de> for EnumAccess<'de> {
+    type Error = Error;
+    type Variant = VariantAccess<'de>;
+
+    fn variant_seed<V>(self, seed: V) -> std::result::Result<(V::Value, Self::Variant), Self::Error>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        if self.object.len() != 1 {
+            return Err(Error::DeserializationError(format!(
+                "Expected enum object with exactly one key, found {}",
+                self.object.len()
+            )));
+        }
+
+        let (key, value) = self.object.into_iter().next().unwrap();
+        let mut key_deserializer =
+            Deserializer::with_value(BorrowedValue::String(Cow::Borrowed(key)));
+        let variant = seed.deserialize(&mut key_deserializer)?;
+
+        Ok((variant, VariantAccess::new(value)))
+    }
+}
+
+struct VariantAccess<'de> {
+    value: BorrowedValue<'de>,
+}
+
+impl<'de> VariantAccess<'de> {
+    fn new(value: BorrowedValue<'de>) -> Self {
+        Self { value }
+    }
+}
+
+impl<'de> de::VariantAccess<'de> for VariantAccess<'de> {
+    type Error = Error;
+
+    fn unit_variant(self) -> std::result::Result<(), Self::Error> {
+        match self.value {
+            BorrowedValue::Null => Ok(()),
+            ref value => Err(value.invalid_type("unit variant (null)")),
+        }
+    }
+
+    fn newtype_variant_seed<T>(self, seed: T) -> std::result::Result<T::Value, Self::Error>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        seed.deserialize(&mut Deserializer::with_value(self.value))
+    }
+
+    fn tuple_variant<V>(self, _len: usize, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.value {
+            BorrowedValue::Array(items) => visitor.visit_seq(SeqAccess::new(items)),
+            ref value => Err(value.invalid_type("tuple variant (array)")),
+        }
+    }
+
+    fn struct_variant<V>(
+        self,
+        _fields: &'static [&'static str],
+        visitor: V,
+    ) -> std::result::Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.value {
+            BorrowedValue::Object(object) => visitor.visit_map(MapAccess::new(object)),
+            ref value => Err(value.invalid_type("struct variant (object)")),
         }
     }
 }

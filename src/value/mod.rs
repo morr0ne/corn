@@ -12,6 +12,7 @@ use crate::Error;
 
 /// Object: Key-value collection that preserves insertion order
 pub type Object = IndexMap<String, Value>;
+pub type BorrowedObject<'input> = IndexMap<&'input str, BorrowedValue<'input>>;
 
 /// Represents a Corn configuration value.
 ///
@@ -49,7 +50,7 @@ pub enum BorrowedValue<'input> {
     Boolean(bool),
     Null,
     Array(Vec<BorrowedValue<'input>>),
-    Object(IndexMap<&'input str, BorrowedValue<'input>>),
+    Object(BorrowedObject<'input>),
 }
 
 impl BorrowedValue<'_> {

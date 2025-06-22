@@ -18,4 +18,4 @@ lalrpop_util::lalrpop_mod!(pub parser, "/corn.rs");
 
 pub use de::{from_str, parse, Deserializer};
 pub use error::{Error, Result};
-pub use value::{BorrowedValue, Integer, Object, Value};
+pub use value::{BorrowedObject, BorrowedValue, Integer, Object, Value};
