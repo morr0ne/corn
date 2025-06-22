@@ -1,10 +1,15 @@
-use serde::Serialize;
-use std::fmt::{Debug, Display};
+use serde::{
+    de::{self, Visitor},
+    forward_to_deserialize_any, Deserialize, Serialize,
+};
+use std::fmt::{self, Debug, Display};
+
+use crate::Error;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 #[repr(transparent)]
 pub struct Integer {
-    pub(crate) inner: IntegerType,
+    inner: IntegerType,
 }
 
 impl Debug for Integer {
@@ -23,7 +28,7 @@ impl Display for Integer {
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-pub(crate) enum IntegerType {
+enum IntegerType {
     Negative(i64),
     Positive(u64),
 }
@@ -86,5 +91,52 @@ impl Serialize for Integer {
             IntegerType::Negative(integer) => serializer.serialize_i64(integer),
             IntegerType::Positive(integer) => serializer.serialize_u64(integer),
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for Integer {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct IntegerVisitor;
+
+        impl<'de> Visitor<'de> for IntegerVisitor {
+            type Value = Integer;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("an Integer")
+            }
+
+            fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+                Ok(value.into())
+            }
+
+            fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+                Ok(value.into())
+            }
+        }
+
+        deserializer.deserialize_any(IntegerVisitor)
+    }
+}
+
+impl<'de> de::Deserializer<'de> for Integer {
+    type Error = Error;
+
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.inner {
+            IntegerType::Negative(integer) => visitor.visit_i64(integer),
+            IntegerType::Positive(integer) => visitor.visit_u64(integer),
+        }
+    }
+
+    forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf option unit unit_struct newtype_struct seq tuple
+        tuple_struct map struct enum identifier ignored_any
     }
 }

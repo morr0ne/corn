@@ -7,7 +7,8 @@ mod integer;
 mod ser;
 
 pub use integer::Integer;
-pub(crate) use integer::IntegerType;
+
+use crate::Error;
 
 /// Object: Key-value collection that preserves insertion order
 pub type Object = IndexMap<String, Value>;
@@ -69,6 +70,22 @@ impl BorrowedValue<'_> {
                     .collect(),
             ),
         }
+    }
+
+    pub const fn as_type(&self) -> &'static str {
+        match self {
+            Self::String(_) => "String",
+            Self::Integer(_) => "Integer",
+            Self::Float(_) => "Float",
+            Self::Boolean(_) => "Boolean",
+            Self::Null => "Null",
+            Self::Array(_) => "Array",
+            Self::Object(_) => "Object",
+        }
+    }
+
+    pub(crate) fn invalid_type(&self, exp: &'static str) -> Error {
+        Error::DeserializationError(format!("Invalid type: {}, expected {exp}", self.as_type()))
     }
 }
 
