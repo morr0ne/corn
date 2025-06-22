@@ -7,7 +7,7 @@ favourites = [
     "Postman",
     4.73753,
     false,
-    { hello = "world" },
+    { hello = "world", food = { favourite = "egg", hated = "beef" } },
 ]
 empty2 = []
 

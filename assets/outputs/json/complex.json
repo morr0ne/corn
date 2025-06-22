@@ -5,12 +5,12 @@
     "full": "John Smith"
   },
   "age": 32,
-  "placeholder": null,
   "employment": {
     "employed": true,
     "name": "Postman",
     "sinceYear": 2019
   },
+  "placeholder": null,
   "parents": {
     "father": {
       "birthday": {

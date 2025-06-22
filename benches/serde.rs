@@ -213,7 +213,7 @@ struct ComplexParentsFatherBirthday {
 
 #[derive(Deserialize, Debug, PartialEq)]
 struct ComplexKeys {
-    #[serde(rename = "!\"£$%^&*()_")]
+    #[serde(rename = "!£$%^&*()_")]
     symbols: i64,
     #[serde(rename = "apple-pie")]
     apple_pie: ComplexKeysApplePie,
