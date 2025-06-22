@@ -30,6 +30,7 @@ impl<'de> Deserializer<'de> {
         Self::resolve_entry(&Entry::Object(object), &inputs)
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(input: &'de str) -> Result<Self> {
         Self::parse(input).map(|value| Self { value })
     }
