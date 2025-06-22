@@ -175,7 +175,7 @@ impl<'de> Deserializer<'de> {
         input: &str,
         inputs: &Inputs<'input>,
     ) -> Result<BorrowedValue<'input>> {
-        if let Some(env) = input.strip_prefix("$env_") {
+        if let Some(env) = input.strip_prefix("env_") {
             if let Ok(env) = std::env::var(env) {
                 return Ok(BorrowedValue::String(Cow::Owned(env)));
             }
