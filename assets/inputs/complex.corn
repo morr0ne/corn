@@ -11,7 +11,7 @@ in {
   // here is another comment
   name.first = $firstName
   name.last = $lastName
-  name.full = "$firstName $lastName"
+  name.full = "${firstName} ${lastName}"
   age = $age
 
   employment = {
