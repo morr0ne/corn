@@ -12,7 +12,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Deserializer<'de> {
-    entry: BorrowedValue<'de>,
+    value: BorrowedValue<'de>,
 }
 
 pub fn parse(input: &str) -> Result<BorrowedValue> {
@@ -34,12 +34,12 @@ impl<'de> Deserializer<'de> {
         let Root { inputs, object } = parser.parse(input, &mut lexer).expect("Failed to parse"); // FIXME: handler errors
 
         Ok(Self {
-            entry: Self::resolve_entry(&Entry::Object(object), &inputs)?,
+            value: Self::resolve_entry(&Entry::Object(object), &inputs)?,
         })
     }
 
-    fn with_entry(entry: BorrowedValue<'de>) -> Self {
-        Self { entry }
+    fn with_value(value: BorrowedValue<'de>) -> Self {
+        Self { value }
     }
 
     fn resolve_entry<'input>(
@@ -204,7 +204,7 @@ macro_rules! deserialize_number {
         where
             V: de::Visitor<'de>,
         {
-            match self.entry {
+            match self.value {
                 BorrowedValue::Integer(integer) => integer.deserialize_any(visitor),
                 ref value => Err(value.invalid_type("Integer")),
             }
@@ -219,7 +219,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        match self.entry {
+        match self.value {
             BorrowedValue::String(ref string) => visitor.visit_str(string),
             BorrowedValue::Integer(integer) => integer.deserialize_any(visitor),
             BorrowedValue::Float(float) => visitor.visit_f64(float),
@@ -244,7 +244,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        match self.entry {
+        match self.value {
             BorrowedValue::Boolean(boolean) => visitor.visit_bool(boolean),
             ref value => Err(value.invalid_type("Boolean")),
         }
@@ -270,7 +270,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        match self.entry {
+        match self.value {
             BorrowedValue::Float(float) => visitor.visit_f64(float),
             ref value => Err(value.invalid_type("Float")),
         }
@@ -287,7 +287,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        match self.entry {
+        match self.value {
             BorrowedValue::String(ref string) => visitor.visit_str(string),
             ref value => Err(value.invalid_type("String")),
         }
@@ -304,7 +304,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        match self.entry {
+        match self.value {
             BorrowedValue::String(ref string) => visitor.visit_bytes(string.as_bytes()),
             ref value => Err(value.invalid_type("Byte String")),
         }
@@ -321,7 +321,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        match self.entry {
+        match self.value {
             BorrowedValue::Null => visitor.visit_none(),
             _ => visitor.visit_some(self),
         }
@@ -331,7 +331,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        match self.entry {
+        match self.value {
             BorrowedValue::Null => visitor.visit_unit(),
             ref value => Err(value.invalid_type("Null")),
         }
@@ -363,7 +363,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        match self.entry {
+        match self.value {
             BorrowedValue::Array(ref mut items) => {
                 let mut seq = Vec::new();
                 std::mem::swap(items, &mut seq);
@@ -397,7 +397,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        match self.entry {
+        match self.value {
             BorrowedValue::Object(ref mut object) => {
                 let mut map = IndexMap::new();
                 std::mem::swap(object, &mut map);
@@ -429,7 +429,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        match self.entry {
+        match self.value {
             BorrowedValue::String(ref string) => {
                 visitor.visit_enum(string.as_ref().into_deserializer())
             }
@@ -473,7 +473,7 @@ impl<'de> de::SeqAccess<'de> for SeqAccess<'de> {
     {
         match self.items.next() {
             Some(item) => {
-                let mut deserializer = Deserializer::with_entry(item);
+                let mut deserializer = Deserializer::with_value(item);
                 seed.deserialize(&mut deserializer).map(Some)
             }
             None => Ok(None),
@@ -506,7 +506,7 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
             Some((key, value)) => {
                 self.current_value = Some(value);
                 let mut key_deserializer =
-                    Deserializer::with_entry(BorrowedValue::String(Cow::Borrowed(key)));
+                    Deserializer::with_value(BorrowedValue::String(Cow::Borrowed(key)));
                 seed.deserialize(&mut key_deserializer).map(Some)
             }
             None => Ok(None),
@@ -519,7 +519,7 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
     {
         match self.current_value.take() {
             Some(value) => {
-                let mut deserializer = Deserializer::with_entry(value);
+                let mut deserializer = Deserializer::with_value(value);
                 seed.deserialize(&mut deserializer)
             }
             None => Err(Error::DeserializationError(
