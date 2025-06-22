@@ -77,9 +77,23 @@ impl<'de> Deserializer<'de> {
                 for pair_or_spread in &obj.pairs {
                     match pair_or_spread {
                         PairOrSpread::Pair(key, value) => {
+                            fn unescape_key(key: &str) -> Cow<str> {
+                                if key.contains("\\'") {
+                                    Cow::Owned(key.replace("\\'", "'"))
+                                } else {
+                                    Cow::Borrowed(key)
+                                }
+                            }
+
+                            let processed_segments: Vec<Cow<str>> = key
+                                .segments
+                                .iter()
+                                .map(|segment| unescape_key(segment))
+                                .collect();
+
                             Self::insert_at_path(
                                 &mut resolved_object,
-                                &key.segments,
+                                &processed_segments,
                                 Self::resolve_entry(value, inputs)?,
                             )?;
                         }
@@ -136,8 +150,8 @@ impl<'de> Deserializer<'de> {
     }
 
     fn insert_at_path<'input>(
-        obj: &mut IndexMap<&'input str, BorrowedValue<'input>>,
-        path: &[&'input str],
+        obj: &mut BorrowedObject<'input>,
+        path: &[Cow<'input, str>],
         value: BorrowedValue<'input>,
     ) -> Result<(), Error> {
         if path.is_empty() {
@@ -145,13 +159,13 @@ impl<'de> Deserializer<'de> {
         }
 
         if path.len() == 1 {
-            obj.insert(path[0], value);
+            obj.insert(path[0].clone(), value);
             return Ok(());
         }
 
         let (first, rest) = path.split_first().unwrap();
         let entry = obj
-            .entry(first)
+            .entry(first.clone())
             .or_insert_with(|| BorrowedValue::Object(indexmap::IndexMap::new()));
 
         match entry {
@@ -544,12 +558,12 @@ impl<'de> de::SeqAccess<'de> for SeqAccess<'de> {
 }
 
 struct MapAccess<'de> {
-    items: indexmap::map::IntoIter<&'de str, BorrowedValue<'de>>,
+    items: indexmap::map::IntoIter<Cow<'de, str>, BorrowedValue<'de>>,
     current_value: Option<BorrowedValue<'de>>,
 }
 
 impl<'de> MapAccess<'de> {
-    fn new(items: IndexMap<&'de str, BorrowedValue<'de>>) -> Self {
+    fn new(items: IndexMap<Cow<'de, str>, BorrowedValue<'de>>) -> Self {
         Self {
             items: items.into_iter(),
             current_value: None,
@@ -567,8 +581,7 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
         match self.items.next() {
             Some((key, value)) => {
                 self.current_value = Some(value);
-                let mut key_deserializer =
-                    Deserializer::with_value(BorrowedValue::String(Cow::Borrowed(key)));
+                let mut key_deserializer = Deserializer::with_value(BorrowedValue::String(key));
                 seed.deserialize(&mut key_deserializer).map(Some)
             }
             None => Ok(None),
@@ -616,8 +629,7 @@ impl<'de> de::EnumAccess<'de> for EnumAccess<'de> {
         }
 
         let (key, value) = self.object.into_iter().next().unwrap();
-        let mut key_deserializer =
-            Deserializer::with_value(BorrowedValue::String(Cow::Borrowed(key)));
+        let mut key_deserializer = Deserializer::with_value(BorrowedValue::String(key));
         let variant = seed.deserialize(&mut key_deserializer)?;
 
         Ok((variant, VariantAccess::new(value)))

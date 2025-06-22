@@ -12,7 +12,7 @@ use crate::Error;
 
 /// Object: Key-value collection that preserves insertion order
 pub type Object = IndexMap<String, Value>;
-pub type BorrowedObject<'input> = IndexMap<&'input str, BorrowedValue<'input>>;
+pub type BorrowedObject<'input> = IndexMap<Cow<'input, str>, BorrowedValue<'input>>;
 
 /// Represents a Corn configuration value.
 ///
@@ -67,7 +67,7 @@ impl BorrowedValue<'_> {
             BorrowedValue::Object(object) => Value::Object(
                 object
                     .into_iter()
-                    .map(|(k, v)| (k.to_owned(), Value::from(v)))
+                    .map(|(k, v)| (k.into_owned(), Value::from(v)))
                     .collect(),
             ),
         }
