@@ -21,11 +21,9 @@ impl ExitCode for CornError {
     fn get_exit_code(&self) -> i32 {
         match self {
             CornError::Io(_) => 3,
-            // CornError::ParserError(_) => 1,
-            // CornError::InputResolveError(_) => 2,
-            // CornError::InvalidPathError(_) => 6,
-            // CornError::InvalidSpreadError(_) => 7,
-            // CornError::InvalidInterpolationError(_) => 8,
+            CornError::InputResolveError(_) => 2,
+            CornError::InvalidSpreadError => 7,
+            CornError::InvalidInterpolationError => 8,
             CornError::DeserializationError(_) => 5,
         }
     }

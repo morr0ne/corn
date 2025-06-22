@@ -24,7 +24,7 @@ impl Serialize for Value {
                 map.end()
             }
             Self::Array(v) => v.serialize(serializer),
-            Self::Null => serializer.serialize_unit(),
+            Self::Null => serializer.serialize_none(),
         }
     }
 }
@@ -51,7 +51,7 @@ impl Serialize for BorrowedValue<'_> {
                 map.end()
             }
             Self::Array(v) => v.serialize(serializer),
-            Self::Null => serializer.serialize_unit(),
+            Self::Null => serializer.serialize_none(),
         }
     }
 }

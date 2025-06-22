@@ -62,7 +62,7 @@ impl<'de> Deserializer<'de> {
 
                             match input {
                                 BorrowedValue::String(string) => base.push_str(&string),
-                                _ => panic!("Only strings can be interpolated into string"), // FIXME: Custom error
+                                _ => return Err(Error::InvalidInterpolationError),
                             }
                         }
                     }
@@ -125,7 +125,7 @@ impl<'de> Deserializer<'de> {
                             BorrowedValue::Array(array) => {
                                 resolved_array.extend(array);
                             }
-                            _ => panic!("Only arrays support being spreaded"), // FIXME: return an error
+                            _ => return Err(Error::InvalidSpreadError),
                         },
                     }
                 }
@@ -185,7 +185,7 @@ impl<'de> Deserializer<'de> {
             return Self::resolve_entry(entry, inputs);
         }
 
-        panic!("No input found") // FIXME: return an error
+        Err(Error::InputResolveError(input.to_string()))
     }
 }
 
