@@ -1,13 +1,12 @@
 use std::borrow::Cow;
 
 use indexmap::IndexMap;
-use serde::{de, forward_to_deserialize_any};
+use serde::de::{self, IntoDeserializer};
 
 use crate::{
     ast::{Entry, EntryOrSpread, Inputs, PairOrSpread, Root},
     lexer::{Lexer, StringPart},
     parser::RootParser,
-    value::IntegerType,
     BorrowedValue, Error, Result,
 };
 
@@ -199,6 +198,20 @@ where
     T::deserialize(&mut deserializer)
 }
 
+macro_rules! deserialize_number {
+    ($method:ident) => {
+        fn $method<V>(self, visitor: V) -> Result<V::Value>
+        where
+            V: de::Visitor<'de>,
+        {
+            match self.entry {
+                BorrowedValue::Integer(integer) => integer.deserialize_any(visitor),
+                ref value => Err(value.invalid_type("Integer")),
+            }
+        }
+    };
+}
+
 impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     type Error = Error;
 
@@ -208,10 +221,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     {
         match self.entry {
             BorrowedValue::String(ref string) => visitor.visit_str(string),
-            BorrowedValue::Integer(integer) => match integer.inner {
-                IntegerType::Negative(n) => visitor.visit_i64(n),
-                IntegerType::Positive(n) => visitor.visit_u64(n),
-            },
+            BorrowedValue::Integer(integer) => integer.deserialize_any(visitor),
             BorrowedValue::Float(float) => visitor.visit_f64(float),
             BorrowedValue::Boolean(boolean) => visitor.visit_bool(boolean),
             BorrowedValue::Null => visitor.visit_unit(),
@@ -230,10 +240,215 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         }
     }
 
-    forward_to_deserialize_any! {
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
-        bytes byte_buf option unit unit_struct newtype_struct seq tuple
-        tuple_struct map struct enum identifier ignored_any
+    fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.entry {
+            BorrowedValue::Boolean(boolean) => visitor.visit_bool(boolean),
+            ref value => Err(value.invalid_type("Boolean")),
+        }
+    }
+
+    deserialize_number!(deserialize_i8);
+    deserialize_number!(deserialize_i16);
+    deserialize_number!(deserialize_i32);
+    deserialize_number!(deserialize_i64);
+    deserialize_number!(deserialize_u8);
+    deserialize_number!(deserialize_u16);
+    deserialize_number!(deserialize_u32);
+    deserialize_number!(deserialize_u64);
+
+    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_f64(visitor)
+    }
+
+    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.entry {
+            BorrowedValue::Float(float) => visitor.visit_f64(float),
+            ref value => Err(value.invalid_type("Float")),
+        }
+    }
+
+    fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_str(visitor)
+    }
+
+    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.entry {
+            BorrowedValue::String(ref string) => visitor.visit_str(string),
+            ref value => Err(value.invalid_type("String")),
+        }
+    }
+
+    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_str(visitor)
+    }
+
+    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.entry {
+            BorrowedValue::String(ref string) => visitor.visit_bytes(string.as_bytes()),
+            ref value => Err(value.invalid_type("Byte String")),
+        }
+    }
+
+    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_bytes(visitor)
+    }
+
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.entry {
+            BorrowedValue::Null => visitor.visit_none(),
+            _ => visitor.visit_some(self),
+        }
+    }
+
+    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.entry {
+            BorrowedValue::Null => visitor.visit_unit(),
+            ref value => Err(value.invalid_type("Null")),
+        }
+    }
+
+    fn deserialize_unit_struct<V>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_unit(visitor)
+    }
+
+    fn deserialize_newtype_struct<V>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_newtype_struct(self)
+    }
+
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.entry {
+            BorrowedValue::Array(ref mut items) => {
+                let mut seq = Vec::new();
+                std::mem::swap(items, &mut seq);
+
+                visitor.visit_seq(SeqAccess::new(seq))
+            }
+            ref value => Err(value.invalid_type("Array")),
+        }
+    }
+
+    fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_seq(visitor)
+    }
+
+    fn deserialize_tuple_struct<V>(
+        self,
+        _name: &'static str,
+        _len: usize,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_seq(visitor)
+    }
+
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.entry {
+            BorrowedValue::Object(ref mut object) => {
+                let mut map = IndexMap::new();
+                std::mem::swap(object, &mut map);
+
+                visitor.visit_map(MapAccess::new(map))
+            }
+            ref value => Err(value.invalid_type("Object")),
+        }
+    }
+
+    fn deserialize_struct<V>(
+        self,
+        _name: &'static str,
+        _fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_map(visitor)
+    }
+
+    fn deserialize_enum<V>(
+        self,
+        _name: &'static str,
+        _variants: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.entry {
+            BorrowedValue::String(ref string) => {
+                visitor.visit_enum(string.as_ref().into_deserializer())
+            }
+            ref value => Err(value.invalid_type("String or Object")),
+        }
+    }
+
+    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_str(visitor)
+    }
+
+    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_any(visitor)
     }
 }
 
