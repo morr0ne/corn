@@ -25,6 +25,7 @@ impl ExitCode for CornError {
             CornError::InvalidSpreadError => 7,
             CornError::InvalidInterpolationError => 8,
             CornError::DeserializationError(_) => 5,
+            CornError::ParseError(_) => 6,
         }
     }
 }

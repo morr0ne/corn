@@ -23,19 +23,15 @@ impl<'de> Deserializer<'de> {
     pub fn parse(input: &str) -> Result<BorrowedValue> {
         let mut lexer = Lexer::new(input);
         let parser = RootParser::new();
-        let Root { inputs, object } = parser.parse(input, &mut lexer).expect("Failed to parse"); // FIXME: handler errors
+        let Root { inputs, object } = parser
+            .parse(input, &mut lexer)
+            .map_err(|err| Error::ParseError(err.to_string()))?;
 
         Self::resolve_entry(&Entry::Object(object), &inputs)
     }
 
     pub fn from_str(input: &'de str) -> Result<Self> {
-        let mut lexer = Lexer::new(input);
-        let parser = RootParser::new();
-        let Root { inputs, object } = parser.parse(input, &mut lexer).expect("Failed to parse"); // FIXME: handler errors
-
-        Ok(Self {
-            value: Self::resolve_entry(&Entry::Object(object), &inputs)?,
-        })
+        Self::parse(input).map(|value| Self { value })
     }
 
     fn with_value(value: BorrowedValue<'de>) -> Self {
@@ -68,7 +64,9 @@ impl<'de> Deserializer<'de> {
                     }
                 }
 
-                Ok(BorrowedValue::String(Cow::Owned(base)))
+                Ok(BorrowedValue::String(Cow::Owned(
+                    Self::process_multiline_string(&base),
+                )))
             }
             Entry::Integer(integer) => Ok(BorrowedValue::Integer(*integer)),
             Entry::Float(float) => Ok(BorrowedValue::Float(*float)),
@@ -169,6 +167,64 @@ impl<'de> Deserializer<'de> {
         }
 
         Ok(())
+    }
+
+    fn process_multiline_string(input: &str) -> String {
+        if !input.starts_with('\n') {
+            return input.to_string();
+        }
+
+        let lines: Vec<&str> = input.lines().collect();
+        if lines.len() < 3 {
+            // Need at least: empty, content, empty/content
+            return input.to_string();
+        }
+
+        // Skip first empty line and handle last line (may be empty or just whitespace)
+        let mut content_lines: Vec<&str> = lines.iter().skip(1).copied().collect();
+
+        // Remove trailing lines that are empty or only whitespace
+        while let Some(&last) = content_lines.last() {
+            if last.trim().is_empty() {
+                content_lines.pop();
+            } else {
+                break;
+            }
+        }
+
+        if content_lines.is_empty() {
+            return String::new();
+        }
+
+        // Find minimum indentation of non-empty lines
+        let min_indent = content_lines
+            .iter()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| line.len() - line.trim_start().len())
+            .min()
+            .unwrap_or(0);
+
+        // Remove minimum indentation and join with newlines
+        let result_lines: Vec<&str> = content_lines
+            .iter()
+            .map(|line| {
+                if line.trim().is_empty() {
+                    ""
+                } else if line.len() >= min_indent {
+                    &line[min_indent..]
+                } else {
+                    line
+                }
+            })
+            .collect();
+
+        let mut result = result_lines.join("\n");
+
+        if !result.is_empty() {
+            result.push('\n');
+        }
+
+        result
     }
 
     fn resolve_input<'input>(

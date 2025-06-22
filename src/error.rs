@@ -19,6 +19,9 @@ pub enum Error {
 
     #[error("failed to deserialize input: {0}")]
     DeserializationError(String),
+
+    #[error("failed to parse input: {0}")]
+    ParseError(String),
 }
 
 impl serde::de::Error for Error {
