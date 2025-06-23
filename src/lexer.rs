@@ -127,7 +127,7 @@ enum StringContext<'input> {
     OpenBraceEscape,
     #[token("\\}")]
     CloseBraceEscape,
-    #[regex(r"\\u[0-9a-fA-F]{4}")]
+    #[regex(r"\\u\{[0-9a-fA-F]{4,6}\}")]
     UnicodeEscape,
 
     #[regex(r"\$\{[a-zA-Z_][a-zA-Z0-9_]*\}", |lex| lex.slice())]
@@ -189,7 +189,7 @@ fn parse_literal<'input>(
             }
             StringContext::UnicodeEscape => {
                 let slice = string_lex.slice();
-                let hex_part = &slice[2..]; // Skip "\\u"
+                let hex_part = &slice[3..slice.len() - 1];
 
                 if let Ok(code) = u32::from_str_radix(hex_part, 16) {
                     if let Some(unicode_char) = char::from_u32(code) {

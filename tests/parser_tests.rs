@@ -98,6 +98,7 @@ generate_eq_tests!(
     spread,
     string,
     string_interpolation,
+    unicode,
     value_after_table,
     very_compact
 );

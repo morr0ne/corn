@@ -443,6 +443,14 @@ struct ValueAfterTable {
     qux: bool,
 }
 
+#[derive(Deserialize, Debug, PartialEq)]
+struct Unicode {
+    plane0: String,
+    plane1: String,
+    plane2: String,
+    plane3: String,
+}
+
 generate_eq_tests!(
     (array, Array),
     (basic, Basic),
@@ -587,6 +595,21 @@ fn null_unit() {
 
     let input = fs::read_to_string(format!("{root_dir}/assets/inputs/{test_name}.corn")).unwrap();
     let config = from_str::<NullUnit>(&input).unwrap();
+
+    let json_input =
+        fs::read_to_string(format!("{root_dir}/assets/outputs/json/{test_name}.json")).unwrap();
+    let json_config = serde_json::from_str(&json_input).unwrap();
+
+    assert_eq!(config, json_config);
+}
+
+#[test]
+fn unicode() {
+    let test_name = "unicode";
+    let root_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+
+    let input = fs::read_to_string(format!("{root_dir}/assets/inputs/{test_name}.corn")).unwrap();
+    let config = from_str::<Unicode>(&input).unwrap();
 
     let json_input =
         fs::read_to_string(format!("{root_dir}/assets/outputs/json/{test_name}.json")).unwrap();
