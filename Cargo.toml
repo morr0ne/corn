@@ -20,7 +20,12 @@ readme = "README.md"
 
 [features]
 # WASM support
-wasm = []
+wasm = [
+    "dep:wasm-bindgen",
+    "dep:serde-wasm-bindgen",
+    "dep:console_error_panic_hook",
+]
+
 # Lua support
 lua51 = ["dep:mlua", "mlua/lua51"]
 lua52 = ["dep:mlua", "mlua/lua52"]
@@ -43,9 +48,9 @@ itoa = "1.0.15"
 thiserror = "2.0.12"
 
 # # WASM support (optional)
-# wasm-bindgen = { version = "0.2.100", optional = true }
-# serde-wasm-bindgen = { version = "0.6.5", optional = true }
-# console_error_panic_hook = { version = "0.1.7", optional = true }
+wasm-bindgen = { version = "0.2.100", optional = true }
+serde-wasm-bindgen = { version = "0.6.5", optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
 
 # Lua support (optional)
 mlua = { version = "0.10.5", features = [
@@ -64,8 +69,10 @@ serde_norway = "0.9.42"
 serde_bytes = "0.11.17"
 toml_edit = { version = "0.22.27", features = ["serde"] }
 anyhow = "1.0.97"
-criterion = { version = "0.6.0", features = ["html_reports"] }
 paste = "1.0.15"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+criterion = { version = "0.6.0", features = ["html_reports"] }
 
 [profile.release]
 lto = true

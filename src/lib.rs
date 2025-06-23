@@ -8,6 +8,8 @@ mod de;
     feature = "luajit52"
 ))]
 mod lua;
+#[cfg(feature = "wasm")]
+mod wasm;
 
 mod error;
 pub(crate) mod value;

@@ -75,8 +75,8 @@ jobs:
       - name: Build
         run: cargo build --features wasm
 
-      # - name: Wasm-Pack Test
-      #   run: wasm-pack test --node
+      - name: Wasm-Pack Test
+        run: wasm-pack test --node --features wasm
 
   build-lua:
     runs-on: ubuntu-latest
