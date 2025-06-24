@@ -11,7 +11,7 @@ repository = "https://github.com/JakeStanger/corn"
 categories = ["config", "parsing"]
 keywords = ["configuration", "language", "wasm", "peg"]
 authors = [
-    "Jake Stanger <mail@jakestanger.com>",
+    "Jake Stanger <mail@jstanger.dev>",
     "Matilde Morrone <contact@morrone.dev>",
 ]
 homepage = "https://cornlang.dev/"
