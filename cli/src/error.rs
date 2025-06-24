@@ -20,12 +20,12 @@ pub trait ExitCode {
 impl ExitCode for CornError {
     fn get_exit_code(&self) -> i32 {
         match self {
+            CornError::ParseError(_) => 1,
             CornError::Io(_) => 3,
             CornError::InputResolveError(_) => 2,
             CornError::InvalidSpreadError => 7,
             CornError::InvalidInterpolationError => 8,
             CornError::DeserializationError(_) => 5,
-            CornError::ParseError(_) => 6,
         }
     }
 }
