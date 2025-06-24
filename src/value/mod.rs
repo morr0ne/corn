@@ -16,14 +16,7 @@ pub type BorrowedObject<'input> = IndexMap<Cow<'input, str>, BorrowedValue<'inpu
 
 /// Represents a Corn configuration value.
 ///
-/// This enum encompasses all possible value types in the Corn language specification:
-/// - String: UTF-8 string values
-/// - Integer: 64-bit signed integers
-/// - Float: 64-bit floating point numbers
-/// - Boolean: true/false values
-/// - Object: Key-value collection that preserves insertion order
-/// - Array: Ordered collections of values
-/// - Null: Represents absence of a value
+/// This enum encompasses all possible value types in the Corn language specification
 #[derive(Debug, Clone)]
 pub enum Value {
     /// A UTF-8 string value
