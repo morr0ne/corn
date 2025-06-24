@@ -106,18 +106,10 @@ impl<'de> Deserializer<'de> {
                                             resolved_object.insert(k, v);
                                         }
                                     }
-                                    _ => {
-                                        return Err(Error::DeserializationError(format!(
-                                            "Cannot spread non-object type: {}",
-                                            name
-                                        )))
-                                    }
+                                    _ => return Err(Error::InvalidSpreadError),
                                 }
                             } else {
-                                return Err(Error::DeserializationError(format!(
-                                    "Undefined input for spread: {}",
-                                    name
-                                )));
+                                return Err(Error::InputResolveError(name.to_string()));
                             }
                         }
                     }
