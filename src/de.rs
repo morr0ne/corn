@@ -10,16 +10,19 @@ use crate::{
     BorrowedObject, BorrowedValue, Error, Result,
 };
 
+/// A structure that deserializes Corn configuration values.
 #[derive(Clone)]
 pub struct Deserializer<'de> {
     value: BorrowedValue<'de>,
 }
 
+/// Parse a Corn configuration string into a borrowed value.
 pub fn parse(input: &str) -> Result<BorrowedValue> {
     Deserializer::parse(input)
 }
 
 impl<'de> Deserializer<'de> {
+    /// Parse a Corn configuration string into a borrowed value.
     pub fn parse(input: &str) -> Result<BorrowedValue> {
         let mut lexer = Lexer::new(input);
         let parser = RootParser::new();
@@ -30,6 +33,7 @@ impl<'de> Deserializer<'de> {
         Self::resolve_entry(&Entry::Object(object), &inputs)
     }
 
+    /// Create a deserializer from a Corn configuration string.
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(input: &'de str) -> Result<Self> {
         Self::parse(input).map(|value| Self { value })
@@ -254,6 +258,7 @@ impl<'de> Deserializer<'de> {
     }
 }
 
+/// Deserialize a Corn configuration string into a Rust data structure.
 pub fn from_str<'a, T>(s: &'a str) -> Result<T, Error>
 where
     T: de::Deserialize<'a>,
