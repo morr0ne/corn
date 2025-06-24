@@ -85,10 +85,11 @@ pub enum Token<'input> {
     #[token("true", |_| true)]
     Boolean(bool),
 
-    #[regex(r"-[0-9]+(_[0-9]+)*", |lex| lex.slice().replace("_", "").parse::<i64>().map(Integer::from))]
-    #[regex(r"[0-9]+(_[0-9]+)*", |lex| lex.slice().replace("_", "").parse::<u64>().map(Integer::from))]
-    // FIXME: this is a mess sob
-    #[regex(r"0x[0-9a-fA-F][_0-9a-fA-F]*", |lex| i64::from_str_radix(&lex.slice().trim_start_matches("0x").replace("_", ""), 16).map(Integer::from))]
+    #[regex(r"-?0x[0-9a-fA-F]+(_[0-9a-fA-F]+)*", parse_hexadecimal)]
+    #[regex(r"-?0o[0-7]+(_[0-7]+)*", parse_octal)]
+    #[regex(r"-?0b[01]+(_[01]+)*", parse_binary)]
+    #[regex(r"-[0-9]+(_[0-9]+)*", parse_negative_decimal)]
+    #[regex(r"[0-9]+(_[0-9]+)*", parse_positive_decimal)]
     Integer(Integer),
 
     #[regex(r"-?[0-9]+\.[0-9]*([eE][+-]?[0-9]+)?", |lex| lex.slice().parse::<f64>())]
@@ -100,8 +101,80 @@ pub enum Token<'input> {
     #[token("\"", parse_literal)]
     Literal(Vec<StringPart<'input>>),
 
-    #[regex(r#"'(?:[^'\\]|\\.)*'|[^\s.=0-9\[\]{}"'][^\s.=\[\]{}"']*"#, |lex| lex.slice().trim_matches('\''))]
+    #[regex(r#"'(?:[^'\\]|\\.)*'|[^\s.=0-9\[\]{}"'-][^\s.=\[\]{}"']*"#, |lex| lex.slice().trim_matches('\''))]
     Key(&'input str),
+}
+
+fn parse_positive_decimal<'input>(
+    lex: &mut logos::Lexer<'input, Token<'input>>,
+) -> Result<Integer, ParseIntError> {
+    lex.slice()
+        .replace("_", "")
+        .parse::<u64>()
+        .map(Integer::from)
+}
+
+fn parse_negative_decimal<'input>(
+    lex: &mut logos::Lexer<'input, Token<'input>>,
+) -> Result<Integer, ParseIntError> {
+    lex.slice()
+        .replace("_", "")
+        .parse::<i64>()
+        .map(Integer::from)
+}
+
+fn parse_hexadecimal<'input>(
+    lex: &mut logos::Lexer<'input, Token<'input>>,
+) -> Result<Integer, ParseIntError> {
+    let input = lex.slice().replace("_", "");
+    let is_negative = input.starts_with('-');
+    let hex_part = if is_negative {
+        &input[3..]
+    } else {
+        &input[2..]
+    };
+
+    if is_negative {
+        i64::from_str_radix(hex_part, 16).map(|n| Integer::from(-n))
+    } else {
+        u64::from_str_radix(hex_part, 16).map(Integer::from)
+    }
+}
+
+fn parse_octal<'input>(
+    lex: &mut logos::Lexer<'input, Token<'input>>,
+) -> Result<Integer, ParseIntError> {
+    let input = lex.slice().replace("_", "");
+    let is_negative = input.starts_with('-');
+    let octal_part = if is_negative {
+        &input[3..]
+    } else {
+        &input[2..]
+    };
+
+    if is_negative {
+        i64::from_str_radix(octal_part, 8).map(|n| Integer::from(-n))
+    } else {
+        u64::from_str_radix(octal_part, 8).map(Integer::from)
+    }
+}
+
+fn parse_binary<'input>(
+    lex: &mut logos::Lexer<'input, Token<'input>>,
+) -> Result<Integer, ParseIntError> {
+    let input = lex.slice().replace("_", "");
+    let is_negative = input.starts_with('-');
+    let binary_part = if is_negative {
+        &input[3..]
+    } else {
+        &input[2..]
+    };
+
+    if is_negative {
+        i64::from_str_radix(binary_part, 2).map(|n| Integer::from(-n))
+    } else {
+        u64::from_str_radix(binary_part, 2).map(Integer::from)
+    }
 }
 
 #[derive(Logos, Debug, PartialEq, Clone)]

@@ -1,5 +1,38 @@
 {
-    foo = 42
-    bar = 0xfafafa
-    baz = 1_000_000
+    // Basic decimal integers
+    positive_decimal = 42
+    negative_decimal = -123
+    zero = 0
+    
+    // Decimal with underscores
+    large_decimal = 1_000_000
+    negative_large_decimal = -1_234_567
+    decimal_with_underscores = 12_34_56
+    
+    // Hexadecimal integers
+    hex_lowercase = 0xfafafa
+    hex_uppercase = 0xFF
+    hex_mixed = 0xAbCdEf
+    negative_hex = -0xABC
+    hex_with_underscores = 0xFA_FA_FA
+    negative_hex_underscores = -0xAB_CD_EF
+    hex_single_digit = 0xF
+    hex_zero = 0x0
+    
+    // Octal integers
+    octal_basic = 0o755
+    octal_zero = 0o0
+    negative_octal = -0o123
+    octal_with_underscores = 0o12_34_56
+    negative_octal_underscores = -0o76_54_32
+    octal_single_digit = 0o7
+    
+    // Binary integers
+    binary_basic = 0b1010
+    binary_zero = 0b0
+    negative_binary = -0b1100
+    binary_with_underscores = 0b1010_1100_1111
+    negative_binary_underscores = -0b1100_0011
+    binary_single_digit = 0b1
+    binary_all_ones = 0b1111
 }

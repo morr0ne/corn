@@ -289,9 +289,42 @@ struct InputDob {
 
 #[derive(Deserialize, Debug, PartialEq)]
 struct Integer {
-    foo: i64,
-    bar: i64,
-    baz: i64,
+    // Basic decimal integers
+    positive_decimal: i64,
+    negative_decimal: i64,
+    zero: i64,
+    
+    // Decimal with underscores
+    large_decimal: i64,
+    negative_large_decimal: i64,
+    decimal_with_underscores: i64,
+    
+    // Hexadecimal integers
+    hex_lowercase: i64,
+    hex_uppercase: i64,
+    hex_mixed: i64,
+    negative_hex: i64,
+    hex_with_underscores: i64,
+    negative_hex_underscores: i64,
+    hex_single_digit: i64,
+    hex_zero: i64,
+    
+    // Octal integers
+    octal_basic: i64,
+    octal_zero: i64,
+    negative_octal: i64,
+    octal_with_underscores: i64,
+    negative_octal_underscores: i64,
+    octal_single_digit: i64,
+    
+    // Binary integers
+    binary_basic: i64,
+    binary_zero: i64,
+    negative_binary: i64,
+    binary_with_underscores: i64,
+    negative_binary_underscores: i64,
+    binary_single_digit: i64,
+    binary_all_ones: i64,
 }
 
 #[derive(Deserialize, Debug, PartialEq)]
