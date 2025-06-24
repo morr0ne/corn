@@ -293,12 +293,12 @@ struct Integer {
     positive_decimal: i64,
     negative_decimal: i64,
     zero: i64,
-    
+
     // Decimal with underscores
     large_decimal: i64,
     negative_large_decimal: i64,
     decimal_with_underscores: i64,
-    
+
     // Hexadecimal integers
     hex_lowercase: i64,
     hex_uppercase: i64,
@@ -308,7 +308,7 @@ struct Integer {
     negative_hex_underscores: i64,
     hex_single_digit: i64,
     hex_zero: i64,
-    
+
     // Octal integers
     octal_basic: i64,
     octal_zero: i64,
@@ -316,7 +316,7 @@ struct Integer {
     octal_with_underscores: i64,
     negative_octal_underscores: i64,
     octal_single_digit: i64,
-    
+
     // Binary integers
     binary_basic: i64,
     binary_zero: i64,
