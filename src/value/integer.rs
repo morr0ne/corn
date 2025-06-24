@@ -21,22 +21,22 @@ impl Debug for Integer {
 impl Display for Integer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.inner {
-            IntegerType::Negative(n) => f.write_str(itoa::Buffer::new().format(n)),
-            IntegerType::Positive(n) => f.write_str(itoa::Buffer::new().format(n)),
+            IntegerType::Signed(n) => f.write_str(itoa::Buffer::new().format(n)),
+            IntegerType::Unsigned(n) => f.write_str(itoa::Buffer::new().format(n)),
         }
     }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 enum IntegerType {
-    Negative(i64),
-    Positive(u64),
+    Signed(i64),
+    Unsigned(u64),
 }
 
 impl From<i64> for Integer {
     fn from(value: i64) -> Self {
         Self {
-            inner: IntegerType::Negative(value),
+            inner: IntegerType::Signed(value),
         }
     }
 }
@@ -44,7 +44,7 @@ impl From<i64> for Integer {
 impl From<u64> for Integer {
     fn from(value: u64) -> Self {
         Self {
-            inner: IntegerType::Positive(value),
+            inner: IntegerType::Unsigned(value),
         }
     }
 }
@@ -52,19 +52,19 @@ impl From<u64> for Integer {
 impl Integer {
     pub const fn is_i64(&self) -> bool {
         match self.inner {
-            IntegerType::Positive(n) => n <= i64::MAX as u64,
-            IntegerType::Negative(_) => true,
+            IntegerType::Unsigned(n) => n <= i64::MAX as u64,
+            IntegerType::Signed(_) => true,
         }
     }
 
     pub const fn is_u64(&self) -> bool {
-        matches!(self.inner, IntegerType::Positive(_))
+        matches!(self.inner, IntegerType::Unsigned(_))
     }
 
     pub const fn as_i64(&self) -> Option<i64> {
         match self.inner {
-            IntegerType::Negative(n) => Some(n),
-            IntegerType::Positive(n) => {
+            IntegerType::Signed(n) => Some(n),
+            IntegerType::Unsigned(n) => {
                 if n <= i64::MAX as u64 {
                     Some(n as i64)
                 } else {
@@ -76,8 +76,8 @@ impl Integer {
 
     pub const fn as_u64(&self) -> Option<u64> {
         match self.inner {
-            IntegerType::Positive(n) => Some(n),
-            IntegerType::Negative(_) => None,
+            IntegerType::Unsigned(n) => Some(n),
+            IntegerType::Signed(_) => None,
         }
     }
 }
@@ -88,8 +88,8 @@ impl Serialize for Integer {
         S: serde::Serializer,
     {
         match self.inner {
-            IntegerType::Negative(integer) => serializer.serialize_i64(integer),
-            IntegerType::Positive(integer) => serializer.serialize_u64(integer),
+            IntegerType::Signed(integer) => serializer.serialize_i64(integer),
+            IntegerType::Unsigned(integer) => serializer.serialize_u64(integer),
         }
     }
 }
@@ -129,8 +129,8 @@ impl<'de> de::Deserializer<'de> for Integer {
         V: de::Visitor<'de>,
     {
         match self.inner {
-            IntegerType::Negative(integer) => visitor.visit_i64(integer),
-            IntegerType::Positive(integer) => visitor.visit_u64(integer),
+            IntegerType::Signed(integer) => visitor.visit_i64(integer),
+            IntegerType::Unsigned(integer) => visitor.visit_u64(integer),
         }
     }
 
