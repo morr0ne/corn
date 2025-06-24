@@ -7,5 +7,6 @@
   },
   "with spaces": true,
   "escaped'quote": false,
-  "escaped=equals": -3
+  "escaped=equals": -3,
+  "normal\"quotes": "funny"
 }
