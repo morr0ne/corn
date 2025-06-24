@@ -47,7 +47,7 @@ lalrpop-util = { version = "0.22.2", features = ["lexer"] }
 itoa = "1.0.15"
 thiserror = "2.0.12"
 
-# # WASM support (optional)
+# WASM support (optional)
 wasm-bindgen = { version = "0.2.100", optional = true }
 serde-wasm-bindgen = { version = "0.6.5", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
