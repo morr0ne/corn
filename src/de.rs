@@ -290,7 +290,10 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         V: de::Visitor<'de>,
     {
         match self.value {
-            BorrowedValue::String(ref string) => visitor.visit_str(string),
+            BorrowedValue::String(ref string) => match string {
+                Cow::Borrowed(s) => visitor.visit_borrowed_str(s),
+                Cow::Owned(s) => visitor.visit_str(s),
+            },
             BorrowedValue::Integer(integer) => integer.deserialize_any(visitor),
             BorrowedValue::Float(float) => visitor.visit_f64(float),
             BorrowedValue::Boolean(boolean) => visitor.visit_bool(boolean),
@@ -358,7 +361,10 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         V: de::Visitor<'de>,
     {
         match self.value {
-            BorrowedValue::String(ref string) => visitor.visit_str(string),
+            BorrowedValue::String(ref string) => match string {
+                Cow::Borrowed(s) => visitor.visit_borrowed_str(s),
+                Cow::Owned(s) => visitor.visit_str(s),
+            },
             ref value => Err(value.invalid_type("String")),
         }
     }
