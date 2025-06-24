@@ -623,7 +623,12 @@ impl<'de> de::EnumAccess<'de> for EnumAccess<'de> {
             )));
         }
 
-        let (key, value) = self.object.into_iter().next().unwrap();
+        let (key, value) = self
+            .object
+            .into_iter()
+            .next()
+            .expect("Internal variant error");
+
         let mut key_deserializer = Deserializer::with_value(BorrowedValue::String(key));
         let variant = seed.deserialize(&mut key_deserializer)?;
 
