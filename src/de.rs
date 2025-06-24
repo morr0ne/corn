@@ -92,6 +92,8 @@ impl<'de> Deserializer<'de> {
                                 .map(|segment| unescape_key(segment))
                                 .collect();
 
+                            resolved_object.reserve_exact(processed_segments.len());
+
                             Self::insert_at_path(
                                 &mut resolved_object,
                                 &processed_segments,
@@ -102,9 +104,7 @@ impl<'de> Deserializer<'de> {
                             if let Some(spread_entry) = inputs.get(name) {
                                 match Self::resolve_entry(spread_entry, inputs)? {
                                     BorrowedValue::Object(spread_obj) => {
-                                        for (k, v) in spread_obj {
-                                            resolved_object.insert(k, v);
-                                        }
+                                        resolved_object.extend(spread_obj);
                                     }
                                     _ => return Err(Error::InvalidSpreadError),
                                 }
@@ -114,6 +114,8 @@ impl<'de> Deserializer<'de> {
                         }
                     }
                 }
+
+                resolved_object.shrink_to_fit();
 
                 Ok(BorrowedValue::Object(resolved_object))
             }
