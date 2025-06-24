@@ -161,7 +161,7 @@ impl<'de> Deserializer<'de> {
         let (first, rest) = path.split_first().expect("Internal splitting error");
         let entry = obj
             .entry(first.clone())
-            .or_insert_with(|| BorrowedValue::Object(indexmap::IndexMap::new()));
+            .or_insert_with(|| BorrowedValue::Object(IndexMap::new()));
 
         match entry {
             BorrowedValue::Object(nested_obj) => {
