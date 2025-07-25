@@ -14,7 +14,7 @@ pub struct Integer {
 
 impl Debug for Integer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Integer({})", self)
+        write!(f, "Integer({self})")
     }
 }
 

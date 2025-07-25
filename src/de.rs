@@ -173,8 +173,7 @@ impl<'de> Deserializer<'de> {
             }
             _ => {
                 return Err(Error::DeserializationError(format!(
-                    "Cannot index into non-object at key: {}",
-                    first
+                    "Cannot index into non-object at key: {first}"
                 )));
             }
         }

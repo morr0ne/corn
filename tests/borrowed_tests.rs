@@ -148,7 +148,7 @@ fn test_borrowed_mixed() {
     assert_eq!(config.name.last, "Smith");
     assert_eq!(config.name.full, "John Smith");
     assert_eq!(config.age, 32);
-    assert_eq!(config.employment.employed, true);
+    assert!(config.employment.employed);
     assert_eq!(config.employment.name, "Postman");
     assert_eq!(config.employment.since_year, 2019);
     assert_eq!(config.gender, "M");
