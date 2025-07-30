@@ -1,26 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use paste::paste;
+use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use serde::Deserialize;
-
-macro_rules! generate_benches {
-    ($(($test_name:ident, $test_type:ty)),+) => {
-        $(
-            paste! {
-                fn [<corn_ $test_name>](_: ()) -> bool {
-                    let input = include_str!(concat!("../assets/inputs/", stringify!($test_name), ".corn"));
-                    let output = corn::from_str::<$test_type>(&input);
-                    output.is_ok()
-                }
-
-                fn [<json_ $test_name>](_: ()) -> bool {
-                    let input = include_str!(concat!("../assets/outputs/json/", stringify!($test_name), ".json"));
-                    let output = serde_json::from_str::<$test_type>(&input);
-                    output.is_ok()
-                }
-            }
-        )+
-    };
-}
+use std::hint::black_box;
 
 #[derive(Deserialize, Debug, PartialEq)]
 struct Empty {}
@@ -413,78 +393,60 @@ struct ValueAfterTable {
     qux: bool,
 }
 
-generate_benches!(
-    (array, Array),
-    (basic, Basic),
-    (basic_empty_let, Basic),
-    (boolean, Boolean),
-    (chained, Chained),
-    (chained_complex, ChainedComplex),
-    (char, Char),
-    (comment, Basic),
-    (compact, Compact),
-    (complex, Complex),
-    (complex_keys, ComplexKeys),
-    (environment_variable, Basic),
-    (float, Float),
-    (input, Input),
-    (input_references_input, Basic),
-    (integer, Integer),
-    (mixed_array, MixedArray),
-    (null, Null),
-    (object, Object),
-    (object_in_array, ObjectInArray),
-    (readme_example, ReadmeExample),
-    (string, String_),
-    (string_interpolation, Basic),
-    (value_after_table, ValueAfterTable),
-    (very_compact, Compact) // (basic_new_type_enum, BasicNewTypeEnum),
-                            // (basic_unit_enum, BasicUnitEnum),
-                            // (basic_new_type, BasicNewType),
-                            // (bytes, Bytes),
-                            // (chained_enum, ChainedEnum),
-                            // (mixed_array_enum, MixedArrayEnum),
-                            // (null_option, NullOption),
-                            // (null_unit, NullUnit),
-                            // (str, Str)
-);
+macro_rules! bench_case {
+    ($group:expr, $name:literal, $input_file:literal, $output_type:ty) => {
+        let input = include_str!(concat!("../assets/inputs/", $input_file, ".corn"));
+        $group.throughput(Throughput::Bytes(input.len() as u64));
+        $group.bench_function($name, |b| {
+            b.iter(|| {
+                let result: Result<$output_type, _> = corn::from_str(black_box(input));
+                black_box(result.unwrap())
+            })
+        });
+    };
+}
 
 fn criterion_benchmark(c: &mut Criterion) {
-    macro_rules! bench {
-        ($name:literal) => {{
-            let mut group = c.benchmark_group($name);
+    let mut group = c.benchmark_group("corn_parsing");
+    group.sample_size(500);
 
-            group.bench_function("corn", |b| b.iter(|| paste!([<corn_$name>])(black_box(()))));
-            group.bench_function("json", |b| b.iter(|| paste!([<json_$name>])(black_box(()))));
-            group.finish();
-        }};
-    }
+    bench_case!(group, "array", "array", Array);
+    bench_case!(group, "basic", "basic", Basic);
+    bench_case!(group, "basic_empty_let", "basic_empty_let", Basic);
+    bench_case!(group, "boolean", "boolean", Boolean);
+    bench_case!(group, "chained", "chained", Chained);
+    bench_case!(group, "chained_complex", "chained_complex", ChainedComplex);
+    bench_case!(group, "char", "char", Char);
+    bench_case!(group, "comment", "comment", Basic);
+    bench_case!(group, "compact", "compact", Compact);
+    bench_case!(group, "complex", "complex", Complex);
+    bench_case!(group, "complex_keys", "complex_keys", ComplexKeys);
+    bench_case!(group, "environment_variable", "environment_variable", Basic);
+    bench_case!(group, "float", "float", Float);
+    bench_case!(group, "input", "input", Input);
+    bench_case!(
+        group,
+        "input_references_input",
+        "input_references_input",
+        Basic
+    );
+    bench_case!(group, "integer", "integer", Integer);
+    bench_case!(group, "mixed_array", "mixed_array", MixedArray);
+    bench_case!(group, "null", "null", Null);
+    bench_case!(group, "object", "object", Object);
+    bench_case!(group, "object_in_array", "object_in_array", ObjectInArray);
+    bench_case!(group, "readme_example", "readme_example", ReadmeExample);
+    bench_case!(group, "string", "string", String_);
+    bench_case!(group, "string_interpolation", "string_interpolation", Basic);
+    bench_case!(
+        group,
+        "value_after_table",
+        "value_after_table",
+        ValueAfterTable
+    );
+    bench_case!(group, "very_compact", "very_compact", Compact);
 
-    bench!("array");
-    bench!("basic");
-    bench!("basic_empty_let");
-    bench!("boolean");
-    bench!("chained");
-    bench!("chained_complex");
-    bench!("char");
-    bench!("comment");
-    bench!("compact");
-    bench!("complex");
-    bench!("complex_keys");
-    bench!("environment_variable");
-    bench!("float");
-    bench!("input");
-    bench!("input_references_input");
-    bench!("integer");
-    bench!("mixed_array");
-    bench!("null");
-    bench!("object");
-    bench!("object_in_array");
-    bench!("readme_example");
-    bench!("string");
-    bench!("string_interpolation");
-    bench!("value_after_table");
-    bench!("very_compact");
+    group.finish();
 }
 
 criterion_group!(benches, criterion_benchmark);
