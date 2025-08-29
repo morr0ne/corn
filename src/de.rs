@@ -7,10 +7,10 @@ use alloc::{
 use serde::de::{self, IntoDeserializer};
 
 use crate::{
+    BorrowedObject, BorrowedValue, Error, IndexMap, Result,
     ast::{Entry, EntryOrSpread, Inputs, PairOrSpread, Root},
     lexer::{Lexer, StringPart},
     parser::RootParser,
-    BorrowedObject, BorrowedValue, Error, IndexMap, Result,
 };
 
 /// A structure that deserializes Corn configuration values.
@@ -247,10 +247,10 @@ impl<'de> Deserializer<'de> {
         inputs: &Inputs<'input>,
     ) -> Result<BorrowedValue<'input>> {
         #[cfg(feature = "std")]
-        if let Some(env) = input.strip_prefix("env_") {
-            if let Ok(env) = std::env::var(env) {
-                return Ok(BorrowedValue::String(Cow::Owned(env)));
-            }
+        if let Some(env) = input.strip_prefix("env_")
+            && let Ok(env) = std::env::var(env)
+        {
+            return Ok(BorrowedValue::String(Cow::Owned(env)));
         }
 
         if let Some(entry) = inputs.get(input) {

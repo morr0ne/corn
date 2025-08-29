@@ -1,4 +1,4 @@
-use crate::{lexer::StringPart, Integer};
+use crate::{Integer, lexer::StringPart};
 use alloc::vec::Vec;
 
 #[cfg(not(feature = "std"))]

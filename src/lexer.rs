@@ -215,11 +215,11 @@ fn parse_literal<'input>(
                 let slice = string_lex.slice();
                 let hex_part = &slice[3..slice.len() - 1];
 
-                if let Ok(code) = u32::from_str_radix(hex_part, 16) {
-                    if let Some(unicode_char) = char::from_u32(code) {
-                        current_literal.push(unicode_char);
-                        continue;
-                    }
+                if let Ok(code) = u32::from_str_radix(hex_part, 16)
+                    && let Some(unicode_char) = char::from_u32(code)
+                {
+                    current_literal.push(unicode_char);
+                    continue;
                 }
 
                 current_literal.push('\u{FFFD}');

@@ -1,5 +1,5 @@
 use alloc::{string::String, vec::Vec};
-use serde::{de::Visitor, Deserialize};
+use serde::{Deserialize, de::Visitor};
 
 use crate::{Object, Value};
 

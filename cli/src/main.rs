@@ -1,4 +1,4 @@
-use corn::{parse, BorrowedValue};
+use corn::{BorrowedValue, parse};
 use std::io::Read;
 use std::process::exit;
 use std::{fs, io};
@@ -7,7 +7,7 @@ use clap::{Parser, ValueEnum};
 use colored::Colorize;
 
 mod error;
-use error::{print_err, Error, ExitCode};
+use error::{Error, ExitCode, print_err};
 
 #[derive(ValueEnum, Clone, Copy, Debug)]
 enum OutputType {

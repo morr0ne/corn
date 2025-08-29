@@ -27,6 +27,6 @@ pub mod ast;
 pub mod lexer;
 lalrpop_util::lalrpop_mod!(pub parser, "/corn.rs");
 
-pub use de::{from_str, parse, Deserializer};
+pub use de::{Deserializer, from_str, parse};
 pub use error::{Error, Result};
 pub use value::{BorrowedObject, BorrowedValue, Integer, Object, Value};
