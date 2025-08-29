@@ -1,6 +1,10 @@
-use std::collections::HashMap;
-
 use crate::{lexer::StringPart, Integer};
+use alloc::vec::Vec;
+
+#[cfg(not(feature = "std"))]
+use hashbrown::HashMap;
+#[cfg(feature = "std")]
+use std::collections::HashMap;
 
 /// Store for input declarations
 pub type Inputs<'input> = HashMap<&'input str, Entry<'input>>;

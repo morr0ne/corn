@@ -1,13 +1,11 @@
-use std::fmt::Display;
+use alloc::string::{String, ToString};
+use core::fmt::Display;
 use thiserror::Error;
 
-pub type Result<T, E = Error> = std::result::Result<T, E>;
+pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-
     #[error("failed to resolve referenced input `{0}`")]
     InputResolveError(String),
 

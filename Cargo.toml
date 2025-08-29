@@ -19,6 +19,9 @@ documentation = "https://docs.rs/libcorn"
 readme = "README.md"
 
 [features]
+default = ["std"]
+std = ["serde/std", "indexmap/std", "logos/std"]
+
 # WASM support
 wasm = [
     "dep:wasm-bindgen",
@@ -40,12 +43,15 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Core
-serde = "1.0.219"
-indexmap = { version = "2.11.0", features = ["serde"] }
-logos = "0.15.1"
+serde = { version = "1.0.219", default-features = false, features = ["alloc"] }
+indexmap = { version = "2.11.0", features = [
+    "serde",
+], default-features = false }
+logos = { version = "0.15.1", default-features = false, features = ["export_derive"] }
 lalrpop-util = { version = "0.22.2", features = ["lexer"] }
 itoa = "1.0.15"
 thiserror = "2.0.16"
+hashbrown = "0.16.0"
 
 # WASM support (optional)
 wasm-bindgen = { version = "0.2.100", optional = true }

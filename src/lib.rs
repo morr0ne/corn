@@ -1,3 +1,12 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
+#[cfg(feature = "std")]
+pub(crate) use indexmap::IndexMap;
+#[cfg(not(feature = "std"))]
+pub(crate) type IndexMap<K, V, S = hashbrown::DefaultHashBuilder> = indexmap::IndexMap<K, V, S>;
+
 mod de;
 #[cfg(any(
     feature = "lua51",

@@ -1,13 +1,16 @@
-use std::borrow::Cow;
-
-use indexmap::IndexMap;
+use alloc::{
+    borrow::Cow,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 use serde::de::{self, IntoDeserializer};
 
 use crate::{
     ast::{Entry, EntryOrSpread, Inputs, PairOrSpread, Root},
     lexer::{Lexer, StringPart},
     parser::RootParser,
-    BorrowedObject, BorrowedValue, Error, Result,
+    BorrowedObject, BorrowedValue, Error, IndexMap, Result,
 };
 
 /// A structure that deserializes Corn configuration values.
@@ -77,7 +80,7 @@ impl<'de> Deserializer<'de> {
             Entry::Float(float) => Ok(BorrowedValue::Float(*float)),
             Entry::Boolean(boolean) => Ok(BorrowedValue::Boolean(*boolean)),
             Entry::Object(obj) => {
-                let mut resolved_object = IndexMap::new();
+                let mut resolved_object = IndexMap::default();
 
                 for pair_or_spread in &obj.pairs {
                     match pair_or_spread {
@@ -165,7 +168,7 @@ impl<'de> Deserializer<'de> {
         let (first, rest) = path.split_first().expect("Internal splitting error");
         let entry = obj
             .entry(first.clone())
-            .or_insert_with(|| BorrowedValue::Object(IndexMap::new()));
+            .or_insert_with(|| BorrowedValue::Object(IndexMap::default()));
 
         match entry {
             BorrowedValue::Object(nested_obj) => {
@@ -243,6 +246,7 @@ impl<'de> Deserializer<'de> {
         input: &str,
         inputs: &Inputs<'input>,
     ) -> Result<BorrowedValue<'input>> {
+        #[cfg(feature = "std")]
         if let Some(env) = input.strip_prefix("env_") {
             if let Ok(env) = std::env::var(env) {
                 return Ok(BorrowedValue::String(Cow::Owned(env)));
@@ -299,13 +303,13 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
             BorrowedValue::Null => visitor.visit_unit(),
             BorrowedValue::Array(ref mut items) => {
                 let mut seq = Vec::new();
-                std::mem::swap(items, &mut seq);
+                core::mem::swap(items, &mut seq);
 
                 visitor.visit_seq(SeqAccess::new(seq))
             }
             BorrowedValue::Object(ref mut object) => {
-                let mut map = IndexMap::new();
-                std::mem::swap(object, &mut map);
+                let mut map = IndexMap::default();
+                core::mem::swap(object, &mut map);
 
                 visitor.visit_map(MapAccess::new(map))
             }
@@ -441,7 +445,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         match self.value {
             BorrowedValue::Array(ref mut items) => {
                 let mut seq = Vec::new();
-                std::mem::swap(items, &mut seq);
+                core::mem::swap(items, &mut seq);
 
                 visitor.visit_seq(SeqAccess::new(seq))
             }
@@ -474,8 +478,8 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
     {
         match self.value {
             BorrowedValue::Object(ref mut object) => {
-                let mut map = IndexMap::new();
-                std::mem::swap(object, &mut map);
+                let mut map = IndexMap::default();
+                core::mem::swap(object, &mut map);
 
                 visitor.visit_map(MapAccess::new(map))
             }
@@ -509,8 +513,8 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
                 visitor.visit_enum(string.as_ref().into_deserializer())
             }
             BorrowedValue::Object(ref mut object) => {
-                let mut map = IndexMap::new();
-                std::mem::swap(object, &mut map);
+                let mut map = IndexMap::default();
+                core::mem::swap(object, &mut map);
 
                 visitor.visit_enum(EnumAccess::new(map))
             }
@@ -534,7 +538,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
 }
 
 struct SeqAccess<'de> {
-    items: std::vec::IntoIter<BorrowedValue<'de>>,
+    items: alloc::vec::IntoIter<BorrowedValue<'de>>,
 }
 
 impl<'de> SeqAccess<'de> {
@@ -622,7 +626,10 @@ impl<'de> de::EnumAccess<'de> for EnumAccess<'de> {
     type Error = Error;
     type Variant = VariantAccess<'de>;
 
-    fn variant_seed<V>(self, seed: V) -> std::result::Result<(V::Value, Self::Variant), Self::Error>
+    fn variant_seed<V>(
+        self,
+        seed: V,
+    ) -> core::result::Result<(V::Value, Self::Variant), Self::Error>
     where
         V: de::DeserializeSeed<'de>,
     {
@@ -659,21 +666,25 @@ impl<'de> VariantAccess<'de> {
 impl<'de> de::VariantAccess<'de> for VariantAccess<'de> {
     type Error = Error;
 
-    fn unit_variant(self) -> std::result::Result<(), Self::Error> {
+    fn unit_variant(self) -> core::result::Result<(), Self::Error> {
         match self.value {
             BorrowedValue::Null => Ok(()),
             ref value => Err(value.invalid_type("unit variant (null)")),
         }
     }
 
-    fn newtype_variant_seed<T>(self, seed: T) -> std::result::Result<T::Value, Self::Error>
+    fn newtype_variant_seed<T>(self, seed: T) -> core::result::Result<T::Value, Self::Error>
     where
         T: de::DeserializeSeed<'de>,
     {
         seed.deserialize(&mut Deserializer::with_value(self.value))
     }
 
-    fn tuple_variant<V>(self, _len: usize, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn tuple_variant<V>(
+        self,
+        _len: usize,
+        visitor: V,
+    ) -> core::result::Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
@@ -687,7 +698,7 @@ impl<'de> de::VariantAccess<'de> for VariantAccess<'de> {
         self,
         _fields: &'static [&'static str],
         visitor: V,
-    ) -> std::result::Result<V::Value, Self::Error>
+    ) -> core::result::Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {

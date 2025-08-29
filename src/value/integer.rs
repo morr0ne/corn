@@ -1,8 +1,9 @@
+use core::fmt::{Debug, Display};
+
 use serde::{
     de::{self, Visitor},
     forward_to_deserialize_any, Deserialize, Serialize,
 };
-use std::fmt::{self, Debug, Display};
 
 use crate::Error;
 
@@ -13,13 +14,13 @@ pub struct Integer {
 }
 
 impl Debug for Integer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "Integer({self})")
     }
 }
 
 impl Display for Integer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self.inner {
             IntegerType::Signed(n) => f.write_str(itoa::Buffer::new().format(n)),
             IntegerType::Unsigned(n) => f.write_str(itoa::Buffer::new().format(n)),
@@ -104,7 +105,7 @@ impl<'de> Deserialize<'de> for Integer {
         impl<'de> Visitor<'de> for IntegerVisitor {
             type Value = Integer;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
                 formatter.write_str("an Integer")
             }
 

@@ -1,3 +1,4 @@
+use alloc::{string::String, vec::Vec};
 use serde::{de::Visitor, Deserialize};
 
 use crate::{Object, Value};
@@ -12,7 +13,7 @@ impl<'de> Deserialize<'de> for Value {
         impl<'de> Visitor<'de> for ValueVisitor {
             type Value = Value;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
                 formatter.write_str("any valid Corn value")
             }
 
@@ -99,7 +100,7 @@ impl<'de> Deserialize<'de> for Value {
             where
                 A: serde::de::MapAccess<'de>,
             {
-                let mut dict = Object::new();
+                let mut dict = Object::default();
 
                 while let Some((key, value)) = map.next_entry()? {
                     dict.insert(key, value);

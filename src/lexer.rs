@@ -1,12 +1,7 @@
-use std::{
-    borrow::Cow,
-    fmt,
-    num::{ParseFloatError, ParseIntError},
-    str::FromStr,
-};
-use thiserror::Error;
-
+use alloc::{borrow::Cow, string::String, vec::Vec};
+use core::{num::ParseIntError, str::FromStr};
 use logos::{Logos, SpannedIter};
+use thiserror::Error;
 
 use crate::Integer;
 
@@ -40,7 +35,7 @@ pub enum LexicalError {
     #[error("Integer parsing error: {0}")]
     InvalidInteger(#[from] ParseIntError),
     #[error("Float parsing error: {0}")]
-    InvalidFloat(#[from] ParseFloatError),
+    InvalidFloat(#[from] core::num::ParseFloatError),
     #[default]
     #[error("Encountered invalid token")]
     InvalidToken,
@@ -183,7 +178,7 @@ fn parse_literal<'input>(
             StringContext::Content => current_literal.push_str(string_lex.slice()),
             StringContext::Interpolation(input) => {
                 if !current_literal.is_empty() {
-                    parts.push(StringPart::Literal(Cow::Owned(std::mem::take(
+                    parts.push(StringPart::Literal(Cow::Owned(core::mem::take(
                         &mut current_literal,
                     ))));
                 }
@@ -233,7 +228,7 @@ fn parse_literal<'input>(
     }
 
     if !current_literal.is_empty() {
-        parts.push(StringPart::Literal(Cow::Owned(std::mem::take(
+        parts.push(StringPart::Literal(Cow::Owned(core::mem::take(
             &mut current_literal,
         ))));
     }
@@ -243,8 +238,8 @@ fn parse_literal<'input>(
     Some(parts)
 }
 
-impl fmt::Display for Token<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Token<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Let => write!(f, "let"),
             Self::In => write!(f, "in"),

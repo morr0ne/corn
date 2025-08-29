@@ -1,6 +1,4 @@
-use std::borrow::Cow;
-
-use indexmap::IndexMap;
+use alloc::{borrow::Cow, format, string::String, vec::Vec};
 
 mod de;
 mod integer;
@@ -8,7 +6,7 @@ mod ser;
 
 pub use integer::Integer;
 
-use crate::Error;
+use crate::{Error, IndexMap};
 
 /// Object: Key-value collection that preserves insertion order
 pub type Object = IndexMap<String, Value>;
