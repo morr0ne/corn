@@ -20,13 +20,13 @@ pub struct Deserializer<'de> {
 }
 
 /// Parse a Corn configuration string into a borrowed value.
-pub fn parse(input: &str) -> Result<BorrowedValue> {
+pub fn parse(input: &str) -> Result<BorrowedValue<'_>> {
     Deserializer::parse(input)
 }
 
 impl<'de> Deserializer<'de> {
     /// Parse a Corn configuration string into a borrowed value.
-    pub fn parse(input: &str) -> Result<BorrowedValue> {
+    pub fn parse(input: &str) -> Result<BorrowedValue<'_>> {
         let mut lexer = Lexer::new(input);
         let parser = RootParser::new();
         let Root { inputs, object } = parser
@@ -85,7 +85,7 @@ impl<'de> Deserializer<'de> {
                 for pair_or_spread in &obj.pairs {
                     match pair_or_spread {
                         PairOrSpread::Pair(key, value) => {
-                            fn unescape_key(key: &str) -> Cow<str> {
+                            fn unescape_key(key: &str) -> Cow<'_, str> {
                                 if key.contains("\\'") {
                                     Cow::Owned(key.replace("\\'", "'"))
                                 } else {
