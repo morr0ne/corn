@@ -4,7 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use serde::de::{self, IntoDeserializer};
+use serde_core::de::{self, IntoDeserializer};
 
 use crate::{
     BorrowedObject, BorrowedValue, Error, IndexMap, Result,

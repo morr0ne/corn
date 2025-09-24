@@ -22,7 +22,7 @@ pub enum Error {
     ParseError(String),
 }
 
-impl serde::de::Error for Error {
+impl serde_core::de::Error for Error {
     fn custom<T>(msg: T) -> Self
     where
         T: Display,

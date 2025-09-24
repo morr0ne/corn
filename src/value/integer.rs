@@ -1,6 +1,6 @@
 use core::fmt::{Debug, Display};
 
-use serde::{
+use serde_core::{
     Deserialize, Serialize,
     de::{self, Visitor},
     forward_to_deserialize_any,
@@ -87,7 +87,7 @@ impl Integer {
 impl Serialize for Integer {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer,
+        S: serde_core::Serializer,
     {
         match self.inner {
             IntegerType::Signed(integer) => serializer.serialize_i64(integer),

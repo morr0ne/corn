@@ -20,7 +20,7 @@ readme = "README.md"
 
 [features]
 default = ["std"]
-std = ["serde/std", "indexmap/std", "logos/std"]
+std = ["serde_core/std", "indexmap/std", "logos/std"]
 
 # WASM support
 wasm = [
@@ -43,23 +43,27 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Core
-serde = { version = "1.0.219", default-features = false, features = ["alloc"] }
-indexmap = { version = "2.11.0", features = [
+serde_core = { version = "1.0.226", default-features = false, features = [
+    "alloc",
+] }
+indexmap = { version = "2.11.4", features = [
     "serde",
 ], default-features = false }
-logos = { version = "0.15.1", default-features = false, features = ["export_derive"] }
+logos = { version = "0.15.1", default-features = false, features = [
+    "export_derive",
+] }
 lalrpop-util = { version = "0.22.2", features = ["lexer"] }
 itoa = "1.0.15"
 thiserror = "2.0.16"
 hashbrown = "0.16.0"
 
 # WASM support (optional)
-wasm-bindgen = { version = "0.2.100", optional = true }
+wasm-bindgen = { version = "0.2.104", optional = true }
 serde-wasm-bindgen = { version = "0.6.5", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 
 # Lua support (optional)
-mlua = { version = "0.11.2", features = [
+mlua = { version = "0.11.3", features = [
     "module",
     "macros",
     "serialize",
@@ -69,13 +73,14 @@ mlua = { version = "0.11.2", features = [
 lalrpop = "0.22.2"
 
 [dev-dependencies]
-wasm-bindgen-test = { version = "0.3.50" }
-serde_json = "1.0.143"
+wasm-bindgen-test = { version = "0.3.54" }
+serde_json = "1.0.145"
 serde_norway = "0.9.42"
-serde_bytes = "0.11.17"
-toml_edit = { version = "0.23.4", features = ["serde"] }
-anyhow = "1.0.99"
+serde_bytes = "0.11.19"
+toml_edit = { version = "0.23.6", features = ["serde"] }
+anyhow = "1.0.100"
 paste = "1.0.15"
+serde = { version = "1.0.226", features = ["derive"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 criterion = { version = "0.7.0", features = ["html_reports"] }
