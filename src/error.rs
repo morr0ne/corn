@@ -1,26 +1,38 @@
 use alloc::string::{String, ToString};
-use core::fmt::Display;
-use thiserror::Error;
+use core::fmt::{Display, Formatter};
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
-#[derive(Error, Debug)]
+#[derive(Debug)]
 pub enum Error {
-    #[error("failed to resolve referenced input `{0}`")]
     InputResolveError(String),
-
-    #[error("attempted to spread a type that differs from its containing type")]
     InvalidSpreadError,
-
-    #[error("attempted to interpolate a non-string type into a string")]
     InvalidInterpolationError,
-
-    #[error("failed to deserialize input: {0}")]
     DeserializationError(String),
-
-    #[error("failed to parse input: {0}")]
     ParseError(String),
 }
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InputResolveError(input) => {
+                write!(f, "failed to resolve referenced input `{input}`")
+            }
+            Self::InvalidSpreadError => write!(
+                f,
+                "attempted to spread a type that differs from its containing type"
+            ),
+            Self::InvalidInterpolationError => write!(
+                f,
+                "attempted to interpolate a non-string type into a string"
+            ),
+            Self::DeserializationError(msg) => write!(f, "failed to deserialize input: {msg}"),
+            Self::ParseError(msg) => write!(f, "failed to parse input: {msg}"),
+        }
+    }
+}
+
+impl core::error::Error for Error {}
 
 impl serde_core::de::Error for Error {
     fn custom<T>(msg: T) -> Self

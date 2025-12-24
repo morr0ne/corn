@@ -63,7 +63,6 @@ logos = { version = "0.16.0", default-features = false, features = [
 ] }
 lalrpop-util = { version = "0.22.2", features = ["lexer"] }
 itoa = "1.0.16"
-thiserror = "2.0.17"
 hashbrown = "0.16.1"
 
 # WASM support (optional)

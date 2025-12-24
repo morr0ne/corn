@@ -1,7 +1,10 @@
 use alloc::{borrow::Cow, string::String, vec::Vec};
-use core::{num::ParseIntError, str::FromStr};
+use core::{
+    fmt::{Display, Formatter},
+    num::ParseIntError,
+    str::FromStr,
+};
 use logos::{Logos, SpannedIter};
-use thiserror::Error;
 
 use crate::Integer;
 
@@ -30,15 +33,36 @@ impl<'input> Iterator for Lexer<'input> {
     }
 }
 
-#[derive(Debug, Default, Error, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum LexicalError {
-    #[error("Integer parsing error: {0}")]
-    InvalidInteger(#[from] ParseIntError),
-    #[error("Float parsing error: {0}")]
-    InvalidFloat(#[from] core::num::ParseFloatError),
+    InvalidInteger(ParseIntError),
+    InvalidFloat(core::num::ParseFloatError),
     #[default]
-    #[error("Encountered invalid token")]
     InvalidToken,
+}
+
+impl Display for LexicalError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InvalidInteger(err) => write!(f, "Integer parsing error: {err}"),
+            Self::InvalidFloat(err) => write!(f, "Float parsing error: {err}"),
+            Self::InvalidToken => write!(f, "Encountered invalid token"),
+        }
+    }
+}
+
+impl core::error::Error for LexicalError {}
+
+impl From<ParseIntError> for LexicalError {
+    fn from(err: ParseIntError) -> Self {
+        Self::InvalidInteger(err)
+    }
+}
+
+impl From<core::num::ParseFloatError> for LexicalError {
+    fn from(err: core::num::ParseFloatError) -> Self {
+        Self::InvalidFloat(err)
+    }
 }
 
 #[derive(Logos, Debug, Clone, PartialEq)]
