@@ -1,7 +1,0 @@
-foo = "bar"
-bar = """
-"\\
-\r\t"""
-baz = "a"
-qux = ""
-
